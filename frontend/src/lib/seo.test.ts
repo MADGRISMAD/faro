@@ -1,0 +1,1 @@
+import {describe,it,expect} from 'vitest';import {canonical} from './seo';describe('canonical',()=>{it('usa el dominio configurado',()=>{expect(canonical({canonical_url:'https://ejemplo.mx/',blog_prefix:'/blog'},'hola')).toBe('https://ejemplo.mx/blog/hola')})});

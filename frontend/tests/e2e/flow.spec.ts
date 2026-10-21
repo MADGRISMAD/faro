@@ -1,0 +1,17 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+const panel='http://localhost:18080';const client='http://localhost:18082';
+test('registro, generación, edición, aprobación, publicación, SSR y widget',async({page,browser})=>{
+ const email=`e2e-${Date.now()}@faro.test`;const domain=`e2e-${Date.now()}.faro.test`;await page.goto(`${panel}/dashboard`);await page.getByLabel('Correo electrónico').fill(email);await page.getByLabel('Contraseña').fill('ClaveLocalSegura2026!');await page.getByRole('button',{name:'Crear cuenta',exact:true}).last().click();await expect(page.getByText('Tu cuenta está lista.')).toBeVisible();
+ await page.screenshot({path:'../screenshots/panel.png',fullPage:true});
+ await page.getByLabel('Nombre').fill('Taller Norte');await page.getByLabel('Dominio').fill(domain);await page.getByLabel('URL canónica').fill(client);await page.getByLabel('Descripción de marca').fill('Herramientas y consejos útiles para dueños de talleres.');await page.getByLabel('Tono').fill('Claro y práctico.');await page.getByRole('button',{name:'Guardar sitio'}).click();await expect(page.getByText('Sitio creado.')).toBeVisible();
+ await page.getByLabel('Tema').fill('Mantenimiento preventivo del automóvil');await page.getByLabel('Negocio').fill('Taller mecánico familiar');await page.getByLabel('Público').fill('Conductores en México');await page.getByLabel('Palabra clave principal').fill('mantenimiento preventivo');await page.getByRole('button',{name:'Generar borrador'}).click();await expect(page.getByText('Borrador listo para revisar.')).toBeVisible({timeout:30000});
+ await expect(page.getByText('Editor',{exact:true})).toBeVisible();await page.screenshot({path:'../screenshots/editor.png',fullPage:true});
+ const title=page.getByLabel('Título');await title.fill('Cómo cuidar tu automóvil en México');await page.getByRole('button',{name:'Guardar cambios'}).click();await expect(page.getByText('Cambios guardados.')).toBeVisible();await page.getByRole('button',{name:'Aprobar'}).click();await expect(page.getByText('Artículo aprobado.')).toBeVisible();await page.getByRole('button',{name:'Publicar'}).click();await expect(page.getByText('Artículo publicado.')).toBeVisible();
+ const articleHref=(await page.getByRole('link',{name:'Ver en el blog'}).getAttribute('href'))!;expect(articleHref).toMatch(/^http:\/\/localhost:18082\/blog\//);
+ await page.setExtraHTTPHeaders({'x-faro-domain':domain});await page.goto(articleHref);await expect(page.getByRole('heading',{name:'Cómo cuidar tu automóvil en México'})).toBeVisible();await page.screenshot({path:'../screenshots/blog.png',fullPage:true});const html=await page.content();expect(html).toContain('application/ld+json');expect(html).toContain('rel="canonical"');
+ const noJs=await browser.newContext({javaScriptEnabled:false,extraHTTPHeaders:{'x-faro-domain':domain}});const noJsPage=await noJs.newPage();await noJsPage.goto(articleHref);await expect(noJsPage.getByRole('heading',{name:'Cómo cuidar tu automóvil en México'})).toBeVisible();await noJs.close();
+ await page.goto(`${client}/widget`);await expect(page.locator('#faro-blog').getByRole('link',{name:'Cómo cuidar tu automóvil en México'})).toBeVisible();await page.screenshot({path:'../screenshots/widget.png',fullPage:true});
+ const missing=await page.request.get(`${client}/blog/no-existe`);expect(missing.status()).toBe(404);
+ fs.writeFileSync('../screenshots/article-url.txt',`${articleHref}\n`);
+});
