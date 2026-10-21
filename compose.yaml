@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: faro
+      POSTGRES_PASSWORD: faro
+      POSTGRES_DB: faro
+    ports: ["15432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faro"]
+      interval: 2s
+      retries: 30
+  backend:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://faro:faro@postgres:5432/faro
+      BIND_ADDR: 0.0.0.0:18081
+      MODE: server
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:18080}
+      GEMINI_INPUT_USD_PER_MILLION: ${GEMINI_INPUT_USD_PER_MILLION:-0.75}
+      GEMINI_OUTPUT_USD_PER_MILLION: ${GEMINI_OUTPUT_USD_PER_MILLION:-3.75}
+      GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-3000}
+    ports: ["18081:18081"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  worker:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgres://faro:faro@postgres:5432/faro
+      MODE: worker
+      GEMINI_INPUT_USD_PER_MILLION: ${GEMINI_INPUT_USD_PER_MILLION:-0.75}
+      GEMINI_OUTPUT_USD_PER_MILLION: ${GEMINI_OUTPUT_USD_PER_MILLION:-3.75}
+      GEMINI_MAX_OUTPUT_TOKENS: ${GEMINI_MAX_OUTPUT_TOKENS:-3000}
+    depends_on:
+      postgres: {condition: service_healthy}
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_BASE_URL: http://backend:18081
+      PUBLIC_BASE_URL: http://localhost:18080
+      PUBLIC_SITE_ID: ${PUBLIC_SITE_ID:-}
+      ORIGIN: http://localhost:18080
+    ports: ["18080:3000"]
+    depends_on: [backend]
+  client-site:
+    build: ./examples/client-site
+    environment:
+      BLOG_UPSTREAM: http://frontend:3000
+      BACKEND_UPSTREAM: http://backend:18081
+      SITE_ID: ${PUBLIC_SITE_ID:-}
+    ports: ["18082:3000"]
+    depends_on: [frontend]
+volumes:
+  pgdata:
