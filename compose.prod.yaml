@@ -1,0 +1,44 @@
+# Producción en el VPS (detrás de Caddy). Los secretos viven en ~/farocontenido/.env del servidor.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: faro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+      POSTGRES_DB: faro
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faro"]
+      interval: 3s
+      retries: 30
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://faro:${POSTGRES_PASSWORD}@postgres:5432/faro
+      BIND_ADDR: 0.0.0.0:18081
+      MODE: server
+    depends_on:
+      postgres: {condition: service_healthy}
+  worker:
+    build: ./backend
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://faro:${POSTGRES_PASSWORD}@postgres:5432/faro
+      MODE: worker
+    depends_on:
+      postgres: {condition: service_healthy}
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      BACKEND_BASE_URL: http://backend:18081
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      ORIGIN: ${PUBLIC_BASE_URL}
+    ports: ["127.0.0.1:8089:3000"]
+    depends_on: [backend]
+volumes:
+  pgdata:
