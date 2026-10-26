@@ -28,5 +28,5 @@ test('la portada tiene «Iniciar sesión» que lleva al acceso y, con sesión ab
 
 	// una página de blog de un cliente no lleva ninguna marca de Faro arriba
 	const html = await (await page.request.get(`${panel}/blog`, { headers: { 'x-faro-domain': 'no-existe.test' } })).text();
-	expect(html).not.toContain('Faro Ai.');
+	expect(html).not.toContain('by Hyperion');
 });

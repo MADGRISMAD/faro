@@ -48,7 +48,7 @@ textarea{min-height:110px;resize:vertical}
 .shell{display:grid;grid-template-columns:272px 1fr;min-height:100vh;gap:0}
 .side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:8px;padding:20px 16px;margin:0;background:var(--surface);border-radius:0 34px 34px 0;box-shadow:var(--out);overflow-y:auto}
 .side .brand{font-family:Fraunces,serif;font-size:1.35rem;font-weight:600;padding:2px 12px 14px;text-decoration:none}
-.side .brand span{color:var(--accent)}
+.side .brand small{display:block;font-family:'Nunito',sans-serif;font-size:.62rem;font-weight:800;letter-spacing:.02em;color:var(--mut);margin-top:-2px}
 .sitebox{display:grid;gap:2px;padding:12px 16px;border-radius:22px;background:var(--well);box-shadow:var(--in-s);margin-bottom:8px}
 .sitebox select{border:0;padding:0;font-weight:800;background:transparent;box-shadow:none;font-size:.92rem;width:100%}
 .sitebox small{color:var(--mut);font-size:.76rem}

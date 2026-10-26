@@ -1,4 +1,4 @@
-# API de lectura de Faro Ai
+# API de lectura de Faro
 
 Faro entrega los **datos** de tus artículos y tu sitio pone el diseño. Es contenido público (solo artículos publicados), con CORS abierto y caché corta.
 

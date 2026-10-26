@@ -58,7 +58,7 @@
 	$: reading = settingUp && ($research?.status === 'queued' || $research?.status === 'running');
 </script>
 
-<svelte:head><title>Faro Ai</title><meta name="robots" content="noindex" /></svelte:head>
+<svelte:head><title>Faro by Hyperion</title><meta name="robots" content="noindex" /></svelte:head>
 <svelte:window on:popstate={here} />
 
 {#if !$ready}
@@ -95,7 +95,7 @@
 {:else}
 	<div class="shell">
 		<aside class="side">
-			<a class="brand" href="/dashboard">Faro Ai<span>.</span></a>
+			<a class="brand" href="/dashboard">Faro<small>by Hyperion</small></a>
 			<div class="sitebox">
 				<select aria-label="Sitio" value={$siteId} on:change={(e) => selectSite(e.currentTarget.value)}>
 					{#each $sites as s}<option value={s.id}>{s.name}</option>{/each}

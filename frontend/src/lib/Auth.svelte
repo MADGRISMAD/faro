@@ -54,7 +54,7 @@
 		<div class="face">
 			{#key face}<img src={face} width="96" height="96" alt="" />{/key}
 		</div>
-		<p class="eyebrow">Faro Ai</p>
+		<p class="eyebrow">Faro <span class="by">by Hyperion</span></p>
 		{#key title}<h1>{title}</h1>{/key}
 		<p class="sub">{sub}</p>
 
@@ -111,6 +111,7 @@
 	@keyframes pop{from{transform:scale(.7);opacity:0}}
 	@keyframes hop{50%{transform:translateY(-10px)}}
 	.eyebrow{margin:12px 0 0}
+	.by{text-transform:none;letter-spacing:.02em;font-size:.82em;font-weight:800;color:var(--mut)}
 	h1{margin:6px 0 0;font-size:1.9rem;animation:rise .3s ease}
 	@keyframes rise{from{opacity:0;transform:translateY(6px)}}
 	.sub{margin:8px 0 22px;color:var(--mut);font-size:.98rem;line-height:1.5}

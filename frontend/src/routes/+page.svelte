@@ -33,8 +33,8 @@
 </script>
 
 <svelte:head>
-	<title>Faro Ai · Que te encuentren primero</title>
-	<meta name="description" content="Pega la dirección de tu sitio y Faro Ai investiga tu negocio, elige los temas y escribe y publica artículos con imagen para que te encuentren en Google." />
+	<title>Faro by Hyperion · Que te encuentren primero</title>
+	<meta name="description" content="Pega la dirección de tu sitio y Faro investiga tu negocio, elige los temas y escribe y publica artículos con imagen para que te encuentren en Google." />
 </svelte:head>
 
 <!-- Icono del faro: se repite en el logo y en el pedestal de la mascota -->
@@ -51,7 +51,7 @@
 <div class="faro">
 	<div class="wrap">
 		<header class="top">
-			<a class="brand" href="/"><span class="logo-tile">{@render faro()}</span><span class="wordmark">Faro Ai<i>.</i></span></a>
+			<a class="brand" href="/"><span class="logo-tile">{@render faro()}</span><span class="wordmark">Faro<small>by Hyperion</small></span></a>
 			<nav class="links" aria-label="Secciones">
 				<a href="#como">Cómo funciona</a><a href="#funciones">Funciones</a><a href="#precios">Precios</a><a href="#preguntas">Preguntas</a>
 			</nav>
@@ -87,7 +87,7 @@
 					<div class="bar well"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg><b>software a la medida en tijuana</b><i class="caret"></i></div>
 					<div class="tabs"><span class="on">Todo</span><span>Imágenes</span><span>Maps</span><span>Noticias</span><span>Más</span></div>
 					<div class="res hit">
-						<span class="badge">Escrito por Faro Ai</span>
+						<span class="badge">Escrito por Faro</span>
 						<div class="site"><span class="fav dark">H</span><div><b>Hyperion Software</b><small>https://hyperionmkt.com › blog › software-a-la-medida-tijuana</small></div></div>
 						<h3>Desarrollo de software a la medida en Tijuana: cómo cotizar tu proyecto</h3>
 						<p><span>hace 2 días —</span> Qué incluye una cotización de <b>software a la medida</b> en <b>Tijuana</b>, cuánto tarda un proyecto y qué preguntar antes de contratar…</p>
@@ -103,7 +103,7 @@
 					</div>
 				</div>
 				<div class="pedestal">{@render faro()}</div>
-				<img class="hero-mascot" src="/mascota/animada.gif" width="260" height="260" alt="Mascota de Faro Ai saludando" />
+				<img class="hero-mascot" src="/mascota/animada.gif" width="260" height="260" alt="Mascota de Faro saludando" />
 			</div>
 		</section>
 
@@ -235,7 +235,7 @@
 			<div class="price-wrap">
 				<img class="cruzado" src="/mascota/cruzado.png" width="760" height="428" alt="" />
 				<article class="card price">
-					<div class="price-head"><b>Faro Ai</b><span class="pill m">Mensual</span></div>
+					<div class="price-head"><b>Faro <small class="by">by Hyperion</small></b><span class="pill m">Mensual</span></div>
 					<p class="amount"><strong>$200</strong> <span>MXN / mes</span></p>
 					<ul class="well checks">
 						<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>Artículos en piloto automático</li>
@@ -276,7 +276,7 @@
 		</section>
 
 		<footer class="foot">
-			<a class="brand" href="/"><span class="logo-tile s">{@render faro()}</span><span class="wordmark s">Faro Ai<i>.</i></span></a>
+			<a class="brand" href="/"><span class="logo-tile s">{@render faro()}</span><span class="wordmark s">Faro<small>by Hyperion</small></span></a>
 			<span>© 2026 Hyperion Software · Tijuana, México</span>
 			<nav aria-label="Legal"><a href="https://www.hyperionmkt.com/faro/privacidad">Privacidad</a><a href="https://www.hyperionmkt.com/faro/terminos">Condiciones</a></nav>
 		</footer>
@@ -322,7 +322,7 @@
 	.logo-tile{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;box-shadow:var(--sh-s);background:#fff}
 	.logo-tile svg,.logo-tile.s svg{width:34px;height:34px;stroke:none}
 	.logo-tile.s{width:40px;height:40px}
-	.wordmark{font-family:Fraunces,serif;font-weight:600;font-size:28px;letter-spacing:-.01em}.wordmark i{color:var(--crimson);font-style:normal}.wordmark.s{font-size:24px}
+	.wordmark{font-family:Fraunces,serif;font-weight:600;font-size:28px;letter-spacing:-.01em;white-space:nowrap}.wordmark small,.by{font-family:'Nunito',sans-serif;font-size:.43em;font-weight:800;letter-spacing:.02em;color:var(--soft);margin-left:.55em}.by{font-size:12px;margin-left:2px}.wordmark.s{font-size:24px}
 	.links{display:flex;gap:42px;font-weight:700;font-size:15.5px;white-space:nowrap}
 	.acct{display:flex;align-items:center;gap:26px}.login{font-weight:700;font-size:15.5px;white-space:nowrap}.btn{white-space:nowrap}
 
