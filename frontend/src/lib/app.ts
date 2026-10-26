@@ -68,7 +68,7 @@ export async function refreshSite() {
 		const [r, a, c] = await Promise.all([api(`/sites/${id}/research`), api('/articles'), api(`/sites/${id}/calendar`)]);
 		if (get(siteId) !== id) return;
 		research.set(r);
-		articles.set(a);
+		articles.set(a.filter((x: Article) => x.site_id === id)); // el panel muestra solo el sitio activo
 		calendar.set(c);
 		// mientras la IA trabaja, cada 3 s; si no, cada minuto (el autopiloto escribe solo y las portadas llegan después del artículo)
 		const busy = r.status === 'queued' || r.status === 'running' || r.articles_pending > 0 || r.images_pending > 0;

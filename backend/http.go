@@ -316,7 +316,7 @@ func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,site_id,title,slug,summary,status,created_at FROM articles WHERE tenant_id=$1 ORDER BY created_at DESC`, t)
+	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,site_id,title,slug,summary,status,created_at,published_at,has_image FROM articles WHERE tenant_id=$1 ORDER BY created_at DESC`, t)
 	if e != nil {
 		dbError(w, e)
 		return
@@ -326,11 +326,17 @@ func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, site, title, slug, summary, status string
 		var created time.Time
-		if e = rows.Scan(&id, &site, &title, &slug, &summary, &status, &created); e != nil {
+		var published sql.NullTime
+		var hasImage bool
+		if e = rows.Scan(&id, &site, &title, &slug, &summary, &status, &created, &published, &hasImage); e != nil {
 			dbError(w, e)
 			return
 		}
-		list = append(list, map[string]any{"id": id, "site_id": site, "title": title, "slug": slug, "summary": summary, "status": status, "created_at": created})
+		var pub any
+		if published.Valid {
+			pub = published.Time
+		}
+		list = append(list, map[string]any{"id": id, "site_id": site, "title": title, "slug": slug, "summary": summary, "status": status, "created_at": created, "published_at": pub, "has_image": hasImage})
 	}
 	jsonResponse(w, 200, list)
 }
