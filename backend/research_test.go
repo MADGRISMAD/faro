@@ -50,8 +50,8 @@ func TestSSRFBloqueaDireccionesPrivadas(t *testing.T) {
 }
 
 func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
-	allowPrivate = true
-	defer func() { allowPrivate = false }()
+	allowPrivate, minAutoWords = true, 0
+	defer func() { allowPrivate, minAutoWords = false, 500 }()
 	var site *httptest.Server
 	site = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -117,7 +117,7 @@ func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
 	var pending int
 	app.DB.QueryRow(`SELECT name,tone FROM sites WHERE id=$1`, siteID).Scan(&name, &tone)
 	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1 AND kind='article' AND status='queued'`, siteID).Scan(&pending)
-	if name != "Taller Rápido" || tone == "" || pending != 3 {
+	if name != "Taller Rápido" || tone == "" || pending != 1 {
 		t.Fatalf("sitio: %q %q, %d artículos en cola", name, tone, pending)
 	}
 	var spent int64
@@ -163,7 +163,50 @@ func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
 	}
 	var total int
 	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1 AND kind='article'`, siteID).Scan(&total)
-	if total != 4 {
+	if total != 2 {
 		t.Fatalf("encoló de más: %d", total)
 	}
+}
+
+func TestAutopilotNoPublicaSensibleNiFlaco(t *testing.T) {
+	app := testApp(t)
+	srv := httptest.NewServer(app.Routes())
+	defer srv.Close()
+	cookie, csrf, tenant := registerTest(t, srv)
+	_, res, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": "clinica-" + token()[:8] + ".test"}, cookie, csrf, "")
+	siteID := res["site_id"].(string)
+	app.DB.Exec(`UPDATE jobs SET status='failed' WHERE site_id=$1 AND kind='research'`, siteID) // la investigación no es lo que se prueba aquí
+	run := func(_ int) string { // escribe un artículo del sitio y devuelve su estado
+		var id string
+		app.DB.QueryRow(`INSERT INTO jobs(tenant_id,site_id,idempotency_key,topic,business,audience,kind) VALUES($1,$2,$3,'Tema','Negocio','Público','article') RETURNING id`, tenant, siteID, token()).Scan(&id)
+		var j *WorkItem
+		for i := 0; i < 30; i++ {
+			j, _ = app.claim(context.Background())
+			if j == nil || j.ID == id {
+				break
+			}
+		}
+		if j == nil || j.ID != id {
+			t.Fatal("no se pudo tomar el job")
+		}
+		if e := app.finish(context.Background(), j, app.Provider.Create(context.Background(), j.Prompt, app.Config)); e != nil {
+			t.Fatal(e)
+		}
+		var st string
+		app.DB.QueryRow(`SELECT status FROM articles WHERE job_id=$1`, id).Scan(&st)
+		return st
+	}
+	minAutoWords = 5000 // el artículo simulado es corto: debe quedar en borrador
+	if st := run(0); st != "draft" {
+		t.Fatalf("artículo corto: %s", st)
+	}
+	minAutoWords = 0
+	if st := run(0); st != "published" {
+		t.Fatalf("artículo normal: %s", st)
+	}
+	app.DB.Exec(`UPDATE sites SET auto_publish=false WHERE id=$1`, siteID) // sector sensible
+	if st := run(0); st != "draft" {
+		t.Fatalf("sector sensible: %s", st)
+	}
+	minAutoWords = 500
 }

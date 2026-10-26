@@ -180,7 +180,7 @@ func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 	body, _ := json.Marshal(g.Content)
 	articleSlug := slug(g.Title) + "-" + j.ID[:8]
 	var article string
-	e = tx.QueryRowContext(ctx, `INSERT INTO articles(tenant_id,site_id,job_id,title,slug,meta_description,summary,content,status,published_at) SELECT $1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN s.autopilot THEN 'published' ELSE 'draft' END,CASE WHEN s.autopilot THEN now() END FROM sites s WHERE s.id=$2 RETURNING id`, j.Tenant, j.Site, j.ID, clean(g.Title, 180), articleSlug, clean(g.MetaDescription, 320), clean(g.Summary, 1000), body).Scan(&article)
+	e = tx.QueryRowContext(ctx, `INSERT INTO articles(tenant_id,site_id,job_id,title,slug,meta_description,summary,content,status,published_at) SELECT $1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN s.autopilot AND s.auto_publish AND $9 THEN 'published' ELSE 'draft' END,CASE WHEN s.autopilot AND s.auto_publish AND $9 THEN now() END FROM sites s WHERE s.id=$2 RETURNING id`, j.Tenant, j.Site, j.ID, clean(g.Title, 180), articleSlug, clean(g.MetaDescription, 320), clean(g.Summary, 1000), body, wordCount(g.Content) >= minAutoWords).Scan(&article)
 	if e != nil {
 		return e
 	}
@@ -229,4 +229,21 @@ func (a *App) Work(ctx context.Context) {
 			slog.Error("No se pudo completar el job", "error", e)
 		}
 	}
+}
+
+// Un artículo corto o flaco no se publica solo: queda en borrador. (ponytail: solo cuenta palabras; la calidad real la juzga una persona)
+var minAutoWords = 500
+
+func wordCount(c Content) int {
+	n := len(strings.Fields(c.Intro))
+	for _, s := range c.Sections {
+		n += len(strings.Fields(s.Heading))
+		for _, p := range s.Paragraphs {
+			n += len(strings.Fields(p))
+		}
+		for _, b := range s.Bullets {
+			n += len(strings.Fields(b))
+		}
+	}
+	return n
 }

@@ -38,6 +38,9 @@ type Profile struct {
 	Location  string   `json:"location"`
 	Offerings []string `json:"offerings"`
 	Topics    []Topic  `json:"topics"`
+	// Sensitive: salud, legal o finanzas. Google exige más cuidado (experiencia y revisión humana), así que nada se publica solo.
+	Sensitive       bool   `json:"sensitive"`
+	SensitiveReason string `json:"sensitive_reason"`
 }
 type ResearchInput struct{ URL, Text string }
 type ResearchResult struct {
@@ -244,8 +247,8 @@ func (g *Gemini) Research(ctx context.Context, in ResearchInput, c Config) Resea
 	str := map[string]any{"type": "STRING"}
 	list := func(item any) map[string]any { return map[string]any{"type": "ARRAY", "items": item} }
 	topic := map[string]any{"type": "OBJECT", "properties": map[string]any{"title": str, "keyword": str, "intent": map[string]any{"type": "STRING", "enum": []string{"informational", "comparison", "purchase", "local"}}, "why": str}, "required": []string{"title", "keyword", "intent", "why"}}
-	schema := map[string]any{"type": "OBJECT", "properties": map[string]any{"name": str, "business": str, "audience": str, "tone": str, "location": str, "offerings": list(str), "topics": list(topic)}, "required": []string{"name", "business", "audience", "tone", "location", "offerings", "topics"}}
-	prompt := "Eres estratega de contenido y SEO. Lee el contenido de este sitio web (texto extraído, puede estar incompleto) y deduce lo siguiente SIN inventar datos que no estén en el sitio: name (nombre del negocio), business (qué hace, en 1-2 frases), audience (a quién le vende), tone (tono de voz de la marca, 3-6 palabras), location (ciudad o región donde opera, o \"México\" si no se sabe), offerings (hasta 8 productos o servicios reales). Después propón EXACTAMENTE 12 temas de artículos de blog en español de México que traigan visitas de Google a este negocio: mezcla intención informativa, de comparación, de compra y local; cada uno con title (título atractivo), keyword (palabra clave principal natural, sin inventar volúmenes), intent y why (por qué le sirve a este negocio, 1 frase). No repitas temas ni propongas nada que el negocio no pueda atender.\n\nSITIO: " + in.URL + "\n\n" + in.Text
+	schema := map[string]any{"type": "OBJECT", "properties": map[string]any{"name": str, "business": str, "audience": str, "tone": str, "location": str, "offerings": list(str), "topics": list(topic), "sensitive": map[string]any{"type": "BOOLEAN"}, "sensitive_reason": str}, "required": []string{"name", "business", "audience", "tone", "location", "offerings", "topics", "sensitive", "sensitive_reason"}}
+	prompt := "Eres estratega de contenido y SEO. Lee el contenido de este sitio web (texto extraído, puede estar incompleto) y deduce lo siguiente SIN inventar datos que no estén en el sitio: name (nombre del negocio), business (qué hace, en 1-2 frases), audience (a quién le vende), tone (tono de voz de la marca, 3-6 palabras), location (ciudad o región donde opera, o \"México\" si no se sabe), offerings (hasta 8 productos o servicios reales). Después propón EXACTAMENTE 12 temas de artículos de blog en español de México que traigan visitas de Google a este negocio: mezcla intención informativa, de comparación, de compra y local; cada uno con title (título atractivo), keyword (palabra clave principal natural, sin inventar volúmenes), intent y why (por qué le sirve a este negocio, 1 frase). No repitas temas ni propongas nada que el negocio no pueda atender. Además marca sensitive=true si el negocio es de salud, medicina, psicología, derecho, finanzas, seguros o inversiones (temas donde Google exige experiencia y revisión de un profesional) y explica en sensitive_reason en una frase; si no, false y vacío.\n\nSITIO: " + in.URL + "\n\n" + in.Text
 	text, inT, outT, unknown, e := geminiJSON(ctx, g.Client, c, prompt, schema, 3000)
 	r := ResearchResult{InputTokens: inT, OutputTokens: outT, Unknown: unknown, Err: e}
 	if e == nil && json.Unmarshal([]byte(text), &r.Profile) != nil {
@@ -301,6 +304,7 @@ func geminiJSON(ctx context.Context, cl *http.Client, c Config, prompt string, s
 func cleanProfile(p Profile) (Profile, error) {
 	p.Name, p.Business, p.Audience = clean(strings.TrimSpace(p.Name), 120), clean(strings.TrimSpace(p.Business), 500), clean(strings.TrimSpace(p.Audience), 300)
 	p.Tone, p.Location = clean(strings.TrimSpace(p.Tone), 120), clean(strings.TrimSpace(p.Location), 120)
+	p.SensitiveReason = clean(strings.TrimSpace(p.SensitiveReason), 200)
 	if !valid(p.Name, 120) || !valid(p.Business, 500) || !valid(p.Audience, 300) {
 		return p, errors.New("perfil incompleto")
 	}
@@ -411,15 +415,17 @@ func (a *App) finishResearch(ctx context.Context, j *WorkItem, r ResearchResult,
 		return e
 	}
 	var auto bool
-	var perWeek int
-	if e = tx.QueryRowContext(ctx, `SELECT autopilot,posts_per_week FROM sites WHERE id=$1`, j.Site).Scan(&auto, &perWeek); e != nil {
+	if e = tx.QueryRowContext(ctx, `SELECT autopilot FROM sites WHERE id=$1`, j.Site).Scan(&auto); e != nil {
 		return e
 	}
-	if auto { // arranque: los primeros artículos se encolan de inmediato (el resto sigue el ritmo semanal)
-		for i := 0; i < len(p.Topics) && i < min(perWeek, 3); i++ {
-			if e = enqueueTopic(ctx, tx, j.Tenant, j.Site, p, p.Topics[i]); e != nil {
-				return e
-			}
+	if p.Sensitive { // sector de salud, legal o finanzas: todo queda en borrador para revisión humana
+		if _, e = tx.ExecContext(ctx, `UPDATE sites SET auto_publish=false WHERE id=$1`, j.Site); e != nil {
+			return e
+		}
+	}
+	if auto { // un sitio nuevo arranca con UN artículo; el resto sigue el ritmo (ver autopilotTick)
+		if e = enqueueTopic(ctx, tx, j.Tenant, j.Site, p, p.Topics[0]); e != nil {
+			return e
 		}
 	}
 	if _, e = tx.ExecContext(ctx, `UPDATE jobs SET status='done',reserved_microusd=0,error_message=NULL,updated_at=now() WHERE id=$1`, j.ID); e != nil {
@@ -442,8 +448,8 @@ func enqueueTopic(ctx context.Context, tx *sql.Tx, tenant, site string, p Profil
 // autopilotTick: por cada sitio con autopiloto, mantiene el ritmo semanal con el siguiente tema sin usar.
 func (a *App) autopilotTick(ctx context.Context) error {
 	rows, e := a.DB.QueryContext(ctx, `SELECT s.id,s.tenant_id,s.posts_per_week,s.research FROM sites s WHERE s.autopilot AND s.research IS NOT NULL AND
-		(SELECT count(*) FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND j.created_at>now()-interval '7 days')<s.posts_per_week AND
-		NOT EXISTS(SELECT 1 FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND (j.status IN ('queued','running') OR j.created_at>now()-make_interval(hours => 168/s.posts_per_week)))`)
+		(SELECT count(*) FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND j.created_at>now()-interval '7 days')<LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' THEN 1 ELSE 3 END) AND
+		NOT EXISTS(SELECT 1 FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND (j.status IN ('queued','running') OR j.created_at>now()-make_interval(hours => 168/LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' THEN 1 ELSE 3 END))))`)
 	if e != nil {
 		return e
 	}
@@ -565,9 +571,9 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var blob []byte
-	var auto bool
+	var auto, autoPublish bool
 	var perWeek int
-	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek)
+	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -585,7 +591,7 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		dbError(w, e)
 		return
 	}
-	out := map[string]any{"status": status, "autopilot": auto, "posts_per_week": perWeek, "error": msg.String}
+	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String}
 	if blob != nil {
 		out["research"] = json.RawMessage(blob)
 	}
@@ -612,8 +618,8 @@ func (a *App) setAutopilot(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &x) {
 		return
 	}
-	if x.PostsPerWeek < 1 || x.PostsPerWeek > 14 {
-		x.PostsPerWeek = 3
+	if x.PostsPerWeek < 1 || x.PostsPerWeek > 3 { // más que esto en un sitio normal parece contenido masivo
+		x.PostsPerWeek = 2
 	}
 	res, e := a.DB.ExecContext(r.Context(), `UPDATE sites SET autopilot=$1,posts_per_week=$2 WHERE id=$3 AND tenant_id=$4`, x.Enabled, x.PostsPerWeek, site, t)
 	if e != nil {
