@@ -26,6 +26,7 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("PATCH /sites/{id}", a.editSite)
 	m.HandleFunc("POST /sites/analyze", a.analyzeSite)
 	m.HandleFunc("GET /sites/{id}/research", a.siteResearch)
+	m.HandleFunc("POST /sites/{id}/research", a.rereadSite)
 	m.HandleFunc("PATCH /sites/{id}/autopilot", a.setAutopilot)
 	m.HandleFunc("PATCH /sites/{id}/brand", a.patchBrand)
 	m.HandleFunc("POST /sites/{id}/brand/confirm", a.confirmBrand)

@@ -147,6 +147,14 @@ func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
 	if code, _, _ := request(t, srv, "PATCH", "/sites/"+siteID+"/brand", map[string]any{"remove_topics": []string{first}, "tone": "Muy directo", "auto_publish": true}, cookie, csrf, ""); code != 200 {
 		t.Fatalf("ajustes del asistente: %d", code)
 	}
+	// «Volver a leer mi sitio»: encola una lectura nueva y no deja encimar otra mientras corre
+	if code, _, _ := request(t, srv, "POST", "/sites/"+siteID+"/research", nil, cookie, csrf, ""); code != 202 {
+		t.Fatalf("releer: %d", code)
+	}
+	if code, _, _ := request(t, srv, "POST", "/sites/"+siteID+"/research", nil, cookie, csrf, ""); code != 409 {
+		t.Fatalf("releer dos veces: %d", code)
+	}
+	app.DB.Exec(`UPDATE jobs SET status='done' WHERE site_id=$1 AND kind='research'`, siteID)
 	if code, _, _ := request(t, srv, "POST", "/sites/"+siteID+"/brand/confirm", map[string]any{}, cookie, csrf, ""); code != 200 {
 		t.Fatalf("confirmar: %d", code)
 	}

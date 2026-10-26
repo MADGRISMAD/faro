@@ -603,6 +603,39 @@ func (a *App) analyzeSite(w http.ResponseWriter, r *http.Request) {
 }
 
 // research devuelve el estado de la investigación del sitio y lo que la IA dedujo.
+// rereadSite: «Volver a leer mi sitio». La IA vuelve a leerlo y reemplaza el Brand DNA; la confirmación, el ritmo
+// y los ajustes de imagen se conservan. Uno a la vez por sitio.
+func (a *App) rereadSite(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := a.auth(w, r, true)
+	if !ok {
+		return
+	}
+	site, ok := requireUUID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	var canonical string
+	var busy bool
+	e := a.DB.QueryRowContext(r.Context(), `SELECT canonical_url,EXISTS(SELECT 1 FROM jobs WHERE site_id=s.id AND kind='research' AND status IN ('queued','running')) FROM sites s WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&canonical, &busy)
+	if errors.Is(e, sql.ErrNoRows) {
+		fail(w, 404, "Sitio no encontrado")
+		return
+	}
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	if busy {
+		fail(w, 409, "Ya estoy leyendo tu sitio; espera a que termine")
+		return
+	}
+	if _, e = a.DB.ExecContext(r.Context(), `INSERT INTO jobs(tenant_id,site_id,idempotency_key,topic,business,audience,kind) VALUES($1,$2,$3,$4,'','','research')`, t, site, fmt.Sprintf("research-%s-%d", site, time.Now().UnixNano()), canonical); e != nil {
+		dbError(w, e)
+		return
+	}
+	jsonResponse(w, 202, map[string]any{"status": "queued"})
+}
+
 func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 	_, t, ok := a.auth(w, r, false)
 	if !ok {
