@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { api } from '#lib/api';
-	import { user, ready, sites, siteId, addingSite, boot, loadSites, selectSite, stopPolling } from '#lib/app';
+	import { user, ready, sites, siteId, addingSite, research, boot, loadSites, selectSite, stopPolling } from '#lib/app';
 
 	let mode: 'login' | 'register' = 'register';
 	let email = '', password = '', url = '', error = '', busy = false;
@@ -58,7 +58,8 @@
 		['/dashboard', 'Inicio'],
 		['/dashboard/brand', 'Brand DNA'],
 		['/dashboard/calendario', 'Calendario'],
-		['/dashboard/articulos', 'Artículos']
+		['/dashboard/articulos', 'Artículos'],
+		['/dashboard/conectar', 'Conectar mi sitio']
 	];
 	let path = '';
 	const here = () => (path = location.pathname.replace(/\/$/, ''));
@@ -112,7 +113,7 @@
 			</div>
 			<nav>
 				{#each nav as [href, label]}
-					<a {href} class:on={path === href} on:click={() => (path = href)}>{label}</a>
+					<a {href} class:on={path === href} on:click={() => (path = href)}>{label}{#if href === '/dashboard/conectar' && $research && !$research.connected}<span class="tag">Falta</span>{/if}</a>
 				{/each}
 				<span class="soon">Redes sociales <span class="tag">Pronto</span></span>
 				<span class="soon">Google Business <span class="tag">Pronto</span></span>

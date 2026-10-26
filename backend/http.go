@@ -29,6 +29,7 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("PATCH /sites/{id}/autopilot", a.setAutopilot)
 	m.HandleFunc("PATCH /sites/{id}/brand", a.patchBrand)
 	m.HandleFunc("GET /sites/{id}/calendar", a.siteCalendar)
+	m.HandleFunc("POST /sites/{id}/verify", a.verifySite)
 	m.HandleFunc("POST /sites/{id}/generations", a.generate)
 	m.HandleFunc("GET /jobs/{id}", a.job)
 	m.HandleFunc("GET /articles", a.articles)
@@ -150,7 +151,7 @@ func (a *App) editSite(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "Datos del sitio inválidos")
 		return
 	}
-	result, e := a.DB.ExecContext(r.Context(), `UPDATE sites SET name=$1,domain=$2,canonical_url=$3,blog_prefix=$4,brand_description=$5,tone=$6 WHERE id=$7 AND tenant_id=$8`, strings.TrimSpace(x.Name), strings.TrimSpace(x.Domain), strings.TrimRight(u.String(), "/"), strings.TrimRight(x.BlogPrefix, "/"), x.BrandDescription, x.Tone, id, t)
+	result, e := a.DB.ExecContext(r.Context(), `UPDATE sites SET name=$1,domain=$2,connected_at=CASE WHEN canonical_url=$3 AND blog_prefix=$4 THEN connected_at END,canonical_url=$3,blog_prefix=$4,brand_description=$5,tone=$6 WHERE id=$7 AND tenant_id=$8`, strings.TrimSpace(x.Name), strings.TrimSpace(x.Domain), strings.TrimRight(u.String(), "/"), strings.TrimRight(x.BlogPrefix, "/"), x.BrandDescription, x.Tone, id, t)
 	if e != nil {
 		var pg *pgconn.PgError
 		if errors.As(e, &pg) && pg.Code == "23505" {
@@ -503,8 +504,9 @@ func (a *App) embed(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var canonical, prefix string
-	e := a.DB.QueryRowContext(r.Context(), `SELECT canonical_url,blog_prefix FROM sites WHERE id=$1`, id).Scan(&canonical, &prefix)
+	var canonical, prefix, domain string
+	var connected bool
+	e := a.DB.QueryRowContext(r.Context(), `SELECT canonical_url,blog_prefix,domain,connected_at IS NOT NULL FROM sites WHERE id=$1`, id).Scan(&canonical, &prefix, &domain, &connected)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -530,7 +532,7 @@ func (a *App) embed(w http.ResponseWriter, r *http.Request) {
 		items = append(items, map[string]any{"title": title, "slug": slug, "summary": summary, "published_at": published})
 	}
 	data, _ := json.Marshal(items)
-	base, _ := json.Marshal(canonical + prefix + "/")
+	base, _ := json.Marshal(blogBase(connected, canonical, prefix, domain) + "/")
 	script := fmt.Sprintf(`(()=>{const el=document.getElementById('faro-blog');if(!el)return;const root=el.attachShadow({mode:'open'});const style=document.createElement('style');style.textContent=':host{display:block;font:inherit}article{padding:1rem 0;border-bottom:1px solid #ddd}a{color:inherit;font-weight:700}p{margin:.4rem 0}';root.append(style);const base=%s;for(const a of %s){const row=document.createElement('article');const link=document.createElement('a');link.href=base+encodeURIComponent(a.slug);link.textContent=a.title;const desc=document.createElement('p');desc.textContent=a.summary;const date=document.createElement('time');date.dateTime=a.published_at;date.textContent=new Date(a.published_at).toLocaleDateString('es-MX');row.append(link,desc,date);root.append(row)}})();`, base, data)
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=60")

@@ -32,6 +32,12 @@
 	{:else if r?.status === 'failed'}
 		<div class="panel"><p class="error" role="alert">{r.error || 'No pude analizar el sitio.'}</p></div>
 	{:else if r}
+		{#if !r.connected}
+			<a class="panel" href="/dashboard/conectar" style="display:block;margin-bottom:18px;text-decoration:none;color:inherit;border-color:#c45530">
+				<b>Tu blog ya funciona, pero aún no está en tu sitio.</b>
+				<span class="muted"> Si abres {r.canonical_url}{r.blog_prefix} hoy verás un 404. Conéctalo en 2 minutos →</span>
+			</a>
+		{/if}
 		<div class="kpis">
 			<div class="kpi"><span>Artículos publicados</span><b>{published.length}</b></div>
 			<div class="kpi"><span>Borradores por revisar</span><b>{drafts.length}</b></div>

@@ -64,7 +64,7 @@
 			busy = false;
 		}
 	}
-	const url = (a: Article) => (site ? `${site.canonical_url}${site.blog_prefix}/${a.slug}` : '#');
+	const url = (a: Article) => ($research?.blog_base ? `${$research.blog_base}/${a.slug}` : '#');
 	const lock = () => selected?.status === 'published';
 </script>
 

@@ -41,6 +41,8 @@ type Profile struct {
 	// Sensitive: salud, legal o finanzas. Google exige más cuidado (experiencia y revisión humana), así que nada se publica solo.
 	Sensitive       bool   `json:"sensitive"`
 	SensitiveReason string `json:"sensitive_reason"`
+	// Platform lo detecta el servidor al leer el sitio (no la IA): decide qué instrucciones de conexión se muestran primero.
+	Platform string `json:"platform"`
 }
 type ResearchInput struct{ URL, Text string }
 type ResearchResult struct {
@@ -116,26 +118,26 @@ func safeClient() *http.Client {
 }
 
 // fetchPage descarga una página HTML (máx. 1.5 MB). Devuelve la URL final tras redirecciones.
-func fetchPage(ctx context.Context, c *http.Client, u string) (string, *url.URL, error) {
+func fetchPage(ctx context.Context, c *http.Client, u string) (string, *url.URL, http.Header, error) {
 	req, e := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if e != nil {
-		return "", nil, e
+		return "", nil, nil, e
 	}
 	req.Header.Set("User-Agent", "FaroContenidoBot/1.0 (+lectura de tu sitio para planear contenido)")
 	req.Header.Set("Accept", "text/html")
 	res, e := c.Do(req)
 	if e != nil {
-		return "", nil, e
+		return "", nil, nil, e
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return "", nil, fmt.Errorf("el sitio respondió con estado %d", res.StatusCode)
+		return "", nil, nil, fmt.Errorf("el sitio respondió con estado %d", res.StatusCode)
 	}
 	if ct := res.Header.Get("Content-Type"); ct != "" && !strings.Contains(ct, "html") {
-		return "", nil, errors.New("no es una página web")
+		return "", nil, nil, errors.New("no es una página web")
 	}
 	b, e := io.ReadAll(io.LimitReader(res.Body, 1500000))
-	return string(b), res.Request.URL, e
+	return string(b), res.Request.URL, res.Header, e
 }
 
 var (
@@ -207,23 +209,62 @@ func internalLinks(html string, base *url.URL, n int) []string {
 	return out
 }
 
-func readSite(ctx context.Context, start string) (text string, final *url.URL, err error) {
+func readSite(ctx context.Context, start string) (text string, final *url.URL, platform string, err error) {
 	c := safeClient()
-	html, final, e := fetchPage(ctx, c, start)
+	html, final, hdr, e := fetchPage(ctx, c, start)
 	if e != nil {
-		return "", nil, fmt.Errorf("No pude abrir tu sitio (%s). Revisa que la dirección sea correcta y pública", e.Error())
+		return "", nil, "", fmt.Errorf("No pude abrir tu sitio (%s). Revisa que la dirección sea correcta y pública", e.Error())
 	}
 	var b strings.Builder
 	b.WriteString("PÁGINA PRINCIPAL " + final.String() + "\n" + extract(html))
 	for _, l := range internalLinks(html, final, 4) {
-		if h, _, e := fetchPage(ctx, c, l); e == nil {
+		if h, _, _, e := fetchPage(ctx, c, l); e == nil {
 			b.WriteString("\nPÁGINA " + l + "\n" + extract(h))
 		}
 		if b.Len() > 14000 {
 			break
 		}
 	}
-	return b.String(), final, nil
+	return b.String(), final, detectPlatform(html, hdr), nil
+}
+
+// detectPlatform adivina con qué está hecho el sitio (por el HTML y las cabeceras) para dar instrucciones a la medida.
+func detectPlatform(html string, h http.Header) string {
+	l := strings.ToLower(html)
+	has := func(subs ...string) bool {
+		for _, s := range subs {
+			if strings.Contains(l, s) {
+				return true
+			}
+		}
+		return false
+	}
+	server := strings.ToLower(h.Get("Server"))
+	switch {
+	case has("wp-content", "wp-json", "content=\"wordpress"):
+		return "wordpress"
+	case h.Get("X-Wix-Request-Id") != "" || has("wixstatic.com"):
+		return "wix"
+	case has("cdn.shopify.com") || h.Get("X-ShopId") != "":
+		return "shopify"
+	case has("static1.squarespace.com", "squarespace-cdn"):
+		return "squarespace"
+	case has("data-wf-site", "webflow.com"):
+		return "webflow"
+	case h.Get("X-Vercel-Id") != "" || strings.Contains(server, "vercel"):
+		return "vercel"
+	case strings.Contains(server, "netlify") || h.Get("X-Nf-Request-Id") != "":
+		return "netlify"
+	case strings.Contains(server, "cloudflare") || h.Get("Cf-Ray") != "":
+		return "cloudflare"
+	case strings.Contains(server, "nginx"):
+		return "nginx"
+	case strings.Contains(server, "apache"):
+		return "apache"
+	case strings.Contains(server, "caddy"):
+		return "caddy"
+	}
+	return "other"
 }
 
 // ───────────── Proveedores ─────────────
@@ -340,7 +381,7 @@ func (a *App) runResearch(ctx context.Context, j *WorkItem) {
 	defer cancel()
 	var r ResearchResult
 	var fetchErr error
-	text, final, e := readSite(callCtx, j.Prompt.Topic)
+	text, final, platform, e := readSite(callCtx, j.Prompt.Topic)
 	if e != nil {
 		fetchErr = e
 	} else {
@@ -350,6 +391,7 @@ func (a *App) runResearch(ctx context.Context, j *WorkItem) {
 			if r.Err != nil {
 				r.Err = errors.New("Gemini devolvió un perfil inválido")
 			}
+			r.Profile.Platform = platform
 		}
 	}
 	if e := a.finishResearch(ctx, j, r, fetchErr, final); e != nil {
@@ -571,10 +613,10 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var blob []byte
-	var auto, autoPublish, images bool
+	var auto, autoPublish, images, connected bool
 	var perWeek int
-	var avoid, imgStyle, imgNotes string
-	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid)
+	var avoid, imgStyle, imgNotes, canonical, prefix, domain string
+	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics,canonical_url,blog_prefix,domain,connected_at IS NOT NULL FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid, &canonical, &prefix, &domain, &connected)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -592,7 +634,7 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		dbError(w, e)
 		return
 	}
-	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String, "images_enabled": images, "image_style": imgStyle, "image_notes": imgNotes, "avoid_topics": avoid}
+	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String, "images_enabled": images, "image_style": imgStyle, "image_notes": imgNotes, "avoid_topics": avoid, "connected": connected, "blog_base": blogBase(connected, canonical, prefix, domain), "hosted_url": hostedBase(domain), "domain": domain, "canonical_url": canonical, "blog_prefix": prefix}
 	if blob != nil {
 		out["research"] = json.RawMessage(blob)
 	}

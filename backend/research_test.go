@@ -36,7 +36,7 @@ func TestPublicIP(t *testing.T) {
 func TestSSRFBloqueaDireccionesPrivadas(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("<html>secreto</html>")) }))
 	defer s.Close()
-	if _, _, e := readSite(context.Background(), s.URL); e == nil {
+	if _, _, _, e := readSite(context.Background(), s.URL); e == nil {
 		t.Fatal("leyó un servidor en 127.0.0.1")
 	}
 	// una redirección hacia la red interna también debe fallar
@@ -44,7 +44,7 @@ func TestSSRFBloqueaDireccionesPrivadas(t *testing.T) {
 		http.Redirect(w, req, "http://169.254.169.254/latest", 302)
 	}))
 	defer r.Close()
-	if _, _, e := readSite(context.Background(), r.URL); e == nil {
+	if _, _, _, e := readSite(context.Background(), r.URL); e == nil {
 		t.Fatal("siguió una redirección a metadata")
 	}
 }
@@ -64,9 +64,12 @@ func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
 		}
 	}))
 	defer site.Close()
-	text, final, e := readSite(context.Background(), site.URL)
+	text, final, platform, e := readSite(context.Background(), site.URL)
 	if e != nil || !strings.Contains(text, "Taller Rápido") || !strings.Contains(text, "Cambio de balatas") || strings.Contains(text, "x</script") || strings.Contains(text, "otro.com") {
 		t.Fatalf("lectura: %v\n%s", e, text)
+	}
+	if platform != "other" {
+		t.Fatalf("plataforma: %s", platform)
 	}
 	if final.Host != strings.TrimPrefix(site.URL, "http://") {
 		t.Fatalf("url final %v", final)
@@ -209,4 +212,58 @@ func TestAutopilotNoPublicaSensibleNiFlaco(t *testing.T) {
 		t.Fatalf("sector sensible: %s", st)
 	}
 	minAutoWords = 500
+}
+
+func TestDetectarPlataforma(t *testing.T) {
+	h := func(k, v string) http.Header { x := http.Header{}; x.Set(k, v); return x }
+	cases := []struct {
+		html string
+		hdr  http.Header
+		want string
+	}{
+		{`<link href="/wp-content/themes/x.css">`, nil, "wordpress"},
+		{`<img src="https://static.wixstatic.com/a.png">`, nil, "wix"},
+		{`<script src="https://cdn.shopify.com/s/x.js">`, nil, "shopify"},
+		{`<html>`, h("X-Vercel-Id", "iad1::abc"), "vercel"},
+		{`<html>`, h("Server", "Netlify"), "netlify"},
+		{`<html>`, h("Server", "cloudflare"), "cloudflare"},
+		{`<html>`, h("Server", "nginx/1.25"), "nginx"},
+		{`<html>`, nil, "other"},
+	}
+	for _, c := range cases {
+		if got := detectPlatform(c.html, c.hdr); got != c.want {
+			t.Errorf("%q %v -> %s, quería %s", c.html, c.hdr, got, c.want)
+		}
+	}
+}
+
+func TestVerificarConexionDelBlog(t *testing.T) {
+	allowPrivate = true
+	defer func() { allowPrivate = false }()
+	const id = "11111111-2222-3333-4444-555555555555"
+	mux := http.NewServeMux()
+	mux.HandleFunc("/blog", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `<html><head><meta name="faro-site" content="%s"></head></html>`, id)
+	})
+	mux.HandleFunc("/otro", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `<html>otra cosa</html>`) })
+	s := httptest.NewServer(mux)
+	defer s.Close()
+	if ok, why := verifyBlog(context.Background(), s.URL, "/blog", id); !ok {
+		t.Fatalf("conectado debía ser verdadero: %s", why)
+	}
+	if ok, why := verifyBlog(context.Background(), s.URL, "/blog", "99999999-2222-3333-4444-555555555555"); ok || why == "" {
+		t.Fatal("aceptó el blog de otro sitio")
+	}
+	if ok, why := verifyBlog(context.Background(), s.URL, "/otro", id); ok || !strings.Contains(why, "no es el blog") {
+		t.Fatalf("página sin marca: %v %s", ok, why)
+	}
+	if ok, why := verifyBlog(context.Background(), s.URL, "/nada", id); ok || !strings.Contains(why, "404") {
+		t.Fatalf("404: %v %s", ok, why)
+	}
+	if got := blogBase(false, "https://x.com", "/blog", "x.com"); !strings.HasSuffix(got, "/p/x.com") {
+		t.Fatalf("sin conectar debe apuntar al blog alojado: %s", got)
+	}
+	if got := blogBase(true, "https://x.com/", "/blog", "x.com"); got != "https://x.com/blog" {
+		t.Fatalf("conectado: %s", got)
+	}
 }

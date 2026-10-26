@@ -2,7 +2,7 @@
 	import { api } from '#lib/api';
 	import { sites, siteId, research, user, refreshSite, loadSites } from '#lib/app';
 
-	let copied = false, error = '', notice = '', canonical = '', prefix = '/blog', loaded = '';
+	let error = '', notice = '', canonical = '', prefix = '/blog', loaded = '';
 	$: if (site && loaded !== site.id) {
 		loaded = site.id;
 		canonical = site.canonical_url;
@@ -20,16 +20,7 @@
 		}
 	}
 	$: site = $sites.find((s) => s.id === $siteId);
-	$: origin = typeof location === 'undefined' ? '' : location.origin;
-	$: code = `<div id="faro-blog"></div>\n<script src="${origin}/api/embed/${$siteId}.js" defer><\/script>`;
 	$: left = $user ? ($user.budget_microusd - $user.spent_microusd - $user.reserved_microusd) / 1e6 : 0;
-	async function copy() {
-		try {
-			await navigator.clipboard.writeText(code);
-			copied = true;
-			setTimeout(() => (copied = false), 1500);
-		} catch {}
-	}
 	async function perWeek(n: number) {
 		error = '';
 		try {
@@ -48,10 +39,8 @@
 	{#if notice}<p class="success" role="status">{notice}</p>{/if}
 
 	<section class="panel" style="margin-bottom:18px">
-		<h2 style="font-size:1.25rem;margin:0 0 4px">Conecta tu sitio</h2>
-		<p class="muted" style="margin-top:0">Pega este código donde quieras que aparezca tu blog. El SEO real lo da el blog publicado en <b>{site?.canonical_url}{site?.blog_prefix}</b>.</p>
-		<div class="code">{code}</div>
-		<button class="btn secondary small" style="margin-top:10px" on:click={copy}>{copied ? 'Copiado' : 'Copiar código'}</button>
+		<h2 style="font-size:1.25rem;margin:0 0 4px">Conexión con tu sitio</h2>
+		<p class="muted" style="margin:0">{$research?.connected ? 'Tu blog está conectado a tu dominio.' : 'Tu blog aún no está en tu dominio.'} <a href="/dashboard/conectar">Ver cómo conectarlo →</a></p>
 	</section>
 
 	<section class="panel" style="margin-bottom:18px">
