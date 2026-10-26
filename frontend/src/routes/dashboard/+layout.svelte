@@ -1,15 +1,16 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import Wizard from '../../lib/Wizard.svelte';
+	import Auth from '../../lib/Auth.svelte';
 	import { api } from '#lib/api';
 	import { user, ready, sites, siteId, addingSite, research, boot, loadSites, selectSite, stopPolling } from '#lib/app';
 
-	let mode: 'login' | 'register' = 'register';
-	let email = '', password = '', url = '', error = '', busy = false;
+	let initialMode: 'login' | 'register' = 'register';
+	let url = '', error = '', busy = false;
 
 	onMount(() => {
 		here();
-		if (new URLSearchParams(location.search).get('modo') === 'entrar') mode = 'login'; // viene del botón «Iniciar sesión» de la portada
+		if (new URLSearchParams(location.search).get('modo') === 'entrar') initialMode = 'login'; // viene del botón «Iniciar sesión» de la portada
 		document.body.classList.add('in-app');
 		boot();
 	});
@@ -18,20 +19,6 @@
 		if (typeof document !== 'undefined') document.body.classList.remove('in-app');
 	});
 
-	async function authenticate() {
-		busy = true;
-		error = '';
-		try {
-			const r = await api(`/auth/${mode}`, { method: 'POST', body: JSON.stringify({ email, password }) });
-			localStorage.setItem('faro_csrf', r.csrf);
-			password = '';
-			await boot();
-		} catch (e) {
-			error = (e as Error).message;
-		} finally {
-			busy = false;
-		}
-	}
 	async function analyze() {
 		busy = true;
 		error = '';
@@ -77,22 +64,7 @@
 {#if !$ready}
 	<main><p class="muted">Cargando…</p></main>
 {:else if !$user}
-	<main style="max-width:480px">
-		<p class="eyebrow">FaroContenido</p>
-		<h1 style="font-size:2.4rem">Tu blog, escrito solo.</h1>
-		<div class="card">
-			<div style="display:flex;gap:10px;margin-bottom:20px">
-				<button class="btn" class:secondary={mode !== 'register'} on:click={() => (mode = 'register')}>Crear cuenta</button>
-				<button class="btn" class:secondary={mode !== 'login'} on:click={() => (mode = 'login')}>Entrar</button>
-			</div>
-			<form class="stack" on:submit|preventDefault={authenticate}>
-				<label>Correo<input type="email" bind:value={email} required autocomplete="email" /></label>
-				<label>Contraseña<input type="password" bind:value={password} required minlength="12" autocomplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
-				{#if error}<p class="error" role="alert">{error}</p>{/if}
-				<button class="btn" disabled={busy}>{mode === 'register' ? 'Crear cuenta' : 'Entrar'}</button>
-			</form>
-		</div>
-	</main>
+	<Auth initial={initialMode} />
 {:else if !$sites.length || $addingSite}
 	<main style="max-width:720px">
 		<p class="eyebrow">Empieza aquí</p>
