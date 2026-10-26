@@ -295,7 +295,7 @@
 	.faro :global(*){box-sizing:border-box}
 	/* los estilos globales del panel (header, h1-h3, nav) no aplican aquí */
 	.faro :global(h1),.faro :global(h2),.faro :global(h3){font-family:'Nunito',sans-serif;line-height:1.1}
-	.faro :global(header.top){flex-wrap:nowrap;margin:0;padding:0 26px 0 16px;border-radius:40px}
+	.faro :global(header.top){flex-wrap:nowrap;margin:0;padding:0 6px;border-radius:0;background:transparent;box-shadow:none}
 	.faro :global(nav){gap:0}
 	.faro :global(.links){gap:42px}
 	.wrap{max-width:1240px;margin:0 auto;padding:24px 20px 40px}
@@ -317,18 +317,19 @@
 	.btn:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--crimson);outline-offset:3px}
 
 	/* encabezado */
-	.top{display:flex;align-items:center;justify-content:space-between;gap:20px;height:68px;padding:0 26px 0 16px;border-radius:40px;background:var(--bg);box-shadow:var(--sh)}
+	.top{display:flex;align-items:center;justify-content:space-between;gap:20px;height:76px;padding:0 6px}
 	.brand{display:flex;align-items:center;gap:14px}
 	.logo-tile{display:grid;place-items:center;width:46px;height:46px;border-radius:15px;box-shadow:var(--sh-s);background:#fff}
 	.logo-tile svg,.logo-tile.s svg{width:34px;height:34px;stroke:none}
 	.logo-tile.s{width:40px;height:40px}
 	.wordmark{font-family:Fraunces,serif;font-weight:600;font-size:28px;letter-spacing:-.01em;white-space:nowrap}.wordmark small,.by{font-family:'Nunito',sans-serif;font-size:.43em;font-weight:800;letter-spacing:.02em;color:var(--soft);margin-left:.55em}.by{font-size:12px;margin-left:2px}.wordmark.s{font-size:24px}
+	.links a{transition:color .15s}.links a:hover{color:var(--crimson)}
 	.links{display:flex;gap:42px;font-weight:700;font-size:15.5px;white-space:nowrap}
 	.acct{display:flex;align-items:center;gap:26px}.login{font-weight:700;font-size:15.5px;white-space:nowrap}.btn{white-space:nowrap}
 
 	/* héroe */
-	.hero{display:grid;grid-template-columns:minmax(0,1fr) 485px;gap:60px;padding:64px 6px 0;align-items:start}
-	.eyebrow{margin:90px 0 0;color:var(--crimson);font-size:14px;font-weight:900;letter-spacing:.17em;text-transform:uppercase}
+	.hero{display:grid;grid-template-columns:minmax(0,1fr) 485px;gap:60px;padding:36px 6px 0;align-items:start}
+	.eyebrow{margin:18px 0 0;color:var(--crimson);font-size:14px;font-weight:900;letter-spacing:.17em;text-transform:uppercase}
 	h1{margin:22px 0 0;font-size:clamp(3.2rem,5.6vw,4.7rem);line-height:1.1;font-weight:900;letter-spacing:-.035em}
 	h1 span{color:var(--crimson)}
 	.lead{margin:30px 0 0;max-width:540px;font-size:19px;line-height:1.55;color:var(--body)}
@@ -474,7 +475,7 @@
 
 	/* celular y tableta */
 	@media(max-width:1100px){
-		.links{display:none}.hero{grid-template-columns:minmax(0,1fr);gap:40px;padding-top:32px}.eyebrow{margin-top:30px}
+		.links{display:none}.hero{grid-template-columns:minmax(0,1fr);gap:40px;padding-top:32px}.eyebrow{margin-top:8px}
 		.hero-art{margin:80px 0 0;max-width:560px}.hero-mascot{left:-10px;top:-190px;width:200px;height:200px}.pedestal{display:none}
 		.steps{grid-template-columns:minmax(0,1fr);gap:30px}.chev{display:none}.steps2,.feat2,.visitas,.feat3{grid-template-columns:minmax(0,1fr)}
 		.final{grid-template-columns:minmax(0,1fr);padding:40px 30px}.final-art{margin:0 auto}
