@@ -110,3 +110,4 @@ table.data{width:100%;border-collapse:collapse;font-size:.9rem}table.data th{tex
 table.data td{padding:11px 10px;border-top:3px solid var(--well)}table.data .r{text-align:right;font-variant-numeric:tabular-nums}
 .kd{display:inline-block;min-width:34px;text-align:center;font-size:.76rem;font-weight:800;border-radius:99px;padding:3px 9px;box-shadow:var(--out-s);background:var(--surface)}
 .kd.easy{background:var(--ink);color:var(--surface)}.kd.medium{background:var(--accent-xl);color:var(--accent-d)}.kd.hard{background:var(--accent);color:var(--ink)}
+.side .legal{margin:2px 0 0;text-align:center;font-size:.74rem;color:var(--mut)}.side .legal a{text-decoration:underline}

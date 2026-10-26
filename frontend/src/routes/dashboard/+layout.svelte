@@ -146,6 +146,7 @@
 				</nav>
 				<div class="me"><b>{($user.email || '?').slice(0, 2).toUpperCase()}</b><span>{$user.email}</span></div>
 				<button class="btn secondary small" on:click={logout}>Cerrar sesión</button>
+				<p class="legal"><a href="https://www.hyperionmkt.com/faro/privacidad" target="_blank" rel="noopener">Privacidad</a> · <a href="https://www.hyperionmkt.com/faro/terminos" target="_blank" rel="noopener">Condiciones</a></p>
 			</div>
 		</aside>
 		<slot />

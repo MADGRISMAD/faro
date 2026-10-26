@@ -87,7 +87,7 @@
 	{:else if data && !data.connected}
 		<div class="panel" style="max-width:640px">
 			<h2 style="font-size:1.4rem;margin:0 0 6px">Conecta Google Search Console</h2>
-			<p class="muted" style="margin-top:0">Así ves cuántas veces Google te muestra, cuántos clics recibes y en qué lugar sales, con los datos reales de Google. Solo lectura: Faro no puede cambiar nada de tu cuenta.</p>
+			<p class="muted" style="margin-top:0">Así ves cuántas veces Google te muestra, cuántos clics recibes y en qué lugar sales, con los datos reales de Google. Solo lectura: Faro no puede cambiar nada de tu cuenta. Lee la <a href="https://www.hyperionmkt.com/faro/privacidad" target="_blank" rel="noopener" style="text-decoration:underline">política de privacidad</a>.</p>
 			<ul class="muted" style="padding-left:18px;line-height:1.7"><li>Tu sitio debe estar verificado en <b>search.google.com/search-console</b> con esa cuenta.</li><li>Google tarda unos 2-3 días en reportar, y un sitio nuevo necesita semanas para aparecer.</li></ul>
 			{#if data.configured}
 				<button class="btn" on:click={connect} disabled={busy}>{busy ? 'Abriendo Google…' : 'Conectar con Google'}</button>
