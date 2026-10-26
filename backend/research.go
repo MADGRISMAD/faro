@@ -123,7 +123,7 @@ func fetchPage(ctx context.Context, c *http.Client, u string) (string, *url.URL,
 	if e != nil {
 		return "", nil, nil, e
 	}
-	req.Header.Set("User-Agent", "FaroContenidoBot/1.0 (+lectura de tu sitio para planear contenido)")
+	req.Header.Set("User-Agent", "FaroAiBot/1.0 (+lectura de tu sitio para planear contenido)")
 	req.Header.Set("Accept", "text/html")
 	res, e := c.Do(req)
 	if e != nil {

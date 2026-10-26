@@ -1,4 +1,4 @@
-# FaroContenido — Fase 1
+# Faro Ai — Fase 1
 
 Panel editorial para generar artículos en español de México, revisarlos y publicarlos en un blog servido por SSR. El backend y el worker están hechos en **Go** por decisión de Manuel; comparten binario y usan PostgreSQL como cola persistente. El frontend y las páginas públicas usan SvelteKit con `adapter-node`.
 

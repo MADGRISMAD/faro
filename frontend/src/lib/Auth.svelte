@@ -54,7 +54,7 @@
 		<div class="face">
 			{#key face}<img src={face} width="96" height="96" alt="" />{/key}
 		</div>
-		<p class="eyebrow">FaroContenido</p>
+		<p class="eyebrow">Faro Ai</p>
 		{#key title}<h1>{title}</h1>{/key}
 		<p class="sub">{sub}</p>
 

@@ -102,7 +102,7 @@
 
 	<section class="panel" style="margin-bottom:18px">
 		<div class="row"><h2 style="font-size:1.25rem;margin:0">1 · Tu blog ya existe <span class="chip published">Listo</span></h2></div>
-		<p class="muted">Está publicado en una dirección de FaroContenido. No necesitas instalar nada: agrega un enlace «Blog» en el menú de tu sitio que apunte aquí.</p>
+		<p class="muted">Está publicado en una dirección de Faro Ai. No necesitas instalar nada: agrega un enlace «Blog» en el menú de tu sitio que apunte aquí.</p>
 		<div class="code">{r?.hosted_url}</div>
 		<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
 			<a class="btn small" href={r?.hosted_url} target="_blank" rel="noopener">Ver mi blog</a>
@@ -129,7 +129,7 @@ GET https://{faro}/api/v1/{domain}/posts/{'{slug}'}</div>
 
 	<section class="panel" style="margin-bottom:18px">
 		<h2 style="font-size:1.25rem;margin:0 0 4px">3 · Faro sirve la página en tu dominio <span class="chip">Sin escribir código de página</span></h2>
-		<p class="muted" style="margin-top:0">Así tus artículos viven en <b>{r?.canonical_url}{r?.blog_prefix}</b> y el prestigio de Google se queda en tu sitio. Tu servidor debe enviar esa ruta a FaroContenido.</p>
+		<p class="muted" style="margin-top:0">Así tus artículos viven en <b>{r?.canonical_url}{r?.blog_prefix}</b> y el prestigio de Google se queda en tu sitio. Tu servidor debe enviar esa ruta a Faro Ai.</p>
 		{#if names[platform]}
 			<p class="panel" style="background:var(--bg);box-shadow:var(--in-s);margin:0 0 14px">Detectamos que tu sitio usa <b>{names[platform]}</b>.
 				{#if closed.includes(platform)}

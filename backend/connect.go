@@ -36,21 +36,21 @@ func verifyBlog(ctx context.Context, canonical, prefix, siteID string) (bool, st
 	if e != nil {
 		return false, "La dirección del blog no es válida."
 	}
-	req.Header.Set("User-Agent", "FaroContenidoBot/1.0 (verificación de conexión)")
+	req.Header.Set("User-Agent", "FaroAiBot/1.0 (verificación de conexión)")
 	res, e := safeClient().Do(req)
 	if e != nil {
 		return false, "No pude abrir " + target + ". Revisa que tu sitio esté en línea."
 	}
 	defer res.Body.Close()
 	if res.StatusCode == 404 {
-		return false, fmt.Sprintf("%s responde 404: tu sitio todavía no está enviando esa ruta a FaroContenido.", target)
+		return false, fmt.Sprintf("%s responde 404: tu sitio todavía no está enviando esa ruta a Faro Ai.", target)
 	}
 	if res.StatusCode != 200 {
 		return false, fmt.Sprintf("%s respondió con estado %d.", target, res.StatusCode)
 	}
 	body, _ := io.ReadAll(io.LimitReader(res.Body, 400000))
 	if !strings.Contains(string(body), `name="faro-site" content="`+siteID+`"`) {
-		return false, target + " abre, pero no es el blog de FaroContenido de este sitio."
+		return false, target + " abre, pero no es el blog de Faro Ai de este sitio."
 	}
 	return true, ""
 }

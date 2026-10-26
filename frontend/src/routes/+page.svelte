@@ -33,8 +33,8 @@
 </script>
 
 <svelte:head>
-	<title>FaroContenido · Que te encuentren primero</title>
-	<meta name="description" content="Pega la dirección de tu sitio y FaroContenido investiga tu negocio, elige los temas y escribe y publica artículos con imagen para que te encuentren en Google." />
+	<title>Faro Ai · Que te encuentren primero</title>
+	<meta name="description" content="Pega la dirección de tu sitio y Faro Ai investiga tu negocio, elige los temas y escribe y publica artículos con imagen para que te encuentren en Google." />
 </svelte:head>
 
 <!-- Icono del faro: se repite en el logo y en el pedestal de la mascota -->
@@ -51,7 +51,7 @@
 <div class="faro">
 	<div class="wrap">
 		<header class="top">
-			<a class="brand" href="/"><span class="logo-tile">{@render faro()}</span><span class="wordmark">FaroContenido<i>.</i></span></a>
+			<a class="brand" href="/"><span class="logo-tile">{@render faro()}</span><span class="wordmark">Faro Ai<i>.</i></span></a>
 			<nav class="links" aria-label="Secciones">
 				<a href="#como">Cómo funciona</a><a href="#funciones">Funciones</a><a href="#precios">Precios</a><a href="#preguntas">Preguntas</a>
 			</nav>
@@ -87,7 +87,7 @@
 					<div class="bar well"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg><b>software a la medida en tijuana</b><i class="caret"></i></div>
 					<div class="tabs"><span class="on">Todo</span><span>Imágenes</span><span>Maps</span><span>Noticias</span><span>Más</span></div>
 					<div class="res hit">
-						<span class="badge">Escrito por FaroContenido</span>
+						<span class="badge">Escrito por Faro Ai</span>
 						<div class="site"><span class="fav dark">H</span><div><b>Hyperion Software</b><small>https://hyperionmkt.com › blog › software-a-la-medida-tijuana</small></div></div>
 						<h3>Desarrollo de software a la medida en Tijuana: cómo cotizar tu proyecto</h3>
 						<p><span>hace 2 días —</span> Qué incluye una cotización de <b>software a la medida</b> en <b>Tijuana</b>, cuánto tarda un proyecto y qué preguntar antes de contratar…</p>
@@ -103,7 +103,7 @@
 					</div>
 				</div>
 				<div class="pedestal">{@render faro()}</div>
-				<img class="hero-mascot" src="/mascota/animada.gif" width="260" height="260" alt="Mascota de FaroContenido saludando" />
+				<img class="hero-mascot" src="/mascota/animada.gif" width="260" height="260" alt="Mascota de Faro Ai saludando" />
 			</div>
 		</section>
 
@@ -235,7 +235,7 @@
 			<div class="price-wrap">
 				<img class="cruzado" src="/mascota/cruzado.png" width="760" height="428" alt="" />
 				<article class="card price">
-					<div class="price-head"><b>FaroContenido</b><span class="pill m">Mensual</span></div>
+					<div class="price-head"><b>Faro Ai</b><span class="pill m">Mensual</span></div>
 					<p class="amount"><strong>$200</strong> <span>MXN / mes</span></p>
 					<ul class="well checks">
 						<li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>Artículos en piloto automático</li>
@@ -276,7 +276,7 @@
 		</section>
 
 		<footer class="foot">
-			<a class="brand" href="/"><span class="logo-tile s">{@render faro()}</span><span class="wordmark s">FaroContenido<i>.</i></span></a>
+			<a class="brand" href="/"><span class="logo-tile s">{@render faro()}</span><span class="wordmark s">Faro Ai<i>.</i></span></a>
 			<span>© 2026 Hyperion Software · Tijuana, México</span>
 			<nav aria-label="Legal"><a href="https://www.hyperionmkt.com/faro/privacidad">Privacidad</a><a href="https://www.hyperionmkt.com/faro/terminos">Condiciones</a></nav>
 		</footer>
