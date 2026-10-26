@@ -155,7 +155,7 @@ func (a *App) v1Post(w http.ResponseWriter, r *http.Request) {
 	var data []byte
 	var at time.Time
 	var img bool
-	e = a.DB.QueryRowContext(r.Context(), `SELECT id,slug,title,summary,meta_description,content,published_at,has_image FROM articles WHERE site_id=$1 AND slug=$2 AND status='published'`, s.ID, r.PathValue("slug")).Scan(&id, &slug, &title, &summary, &meta, &data, &at, &img)
+	e = a.DB.QueryRowContext(r.Context(), `SELECT id,slug,title,summary,meta_description,content,published_at,has_image FROM articles a WHERE site_id=$1 AND (slug=$2 OR id IN (SELECT article_id FROM article_slug_aliases WHERE site_id=$1 AND old_slug=$2)) AND status='published'`, s.ID, r.PathValue("slug")).Scan(&id, &slug, &title, &summary, &meta, &data, &at, &img)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Artículo no encontrado")
 		return
@@ -190,7 +190,7 @@ func (a *App) v1Image(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	serveImage(w, r, a.DB, `SELECT i.mime,i.data,i.alt FROM article_images i JOIN articles a ON a.id=i.article_id WHERE a.site_id=$1 AND a.slug=$2 AND a.status='published'`, false, s.ID, r.PathValue("slug"))
+	serveImage(w, r, a.DB, `SELECT i.mime,i.data,i.alt FROM article_images i JOIN articles a ON a.id=i.article_id WHERE a.site_id=$1 AND (a.slug=$2 OR a.id IN (SELECT article_id FROM article_slug_aliases WHERE site_id=a.site_id AND old_slug=$2)) AND a.status='published'`, false, s.ID, r.PathValue("slug"))
 }
 
 // readingMinutes: ~200 palabras por minuto, mínimo 1.

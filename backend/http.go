@@ -506,7 +506,7 @@ func (a *App) publicArticle(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, e := a.DB.QueryContext(r.Context(), `SELECT `+articleCols+` FROM articles WHERE site_id=$1 AND slug=$2 AND status='published'`, id, r.PathValue("slug"))
+	rows, e := a.DB.QueryContext(r.Context(), `SELECT `+articleCols+` FROM articles WHERE site_id=$1 AND (slug=$2 OR id IN (SELECT article_id FROM article_slug_aliases WHERE site_id=$1 AND old_slug=$2)) AND status='published'`, id, r.PathValue("slug"))
 	if e != nil {
 		dbError(w, e)
 		return

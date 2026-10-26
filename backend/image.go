@@ -265,5 +265,5 @@ func (a *App) publicArticleImage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	serveImage(w, r, a.DB, `SELECT i.mime,i.data,i.alt FROM article_images i JOIN articles a ON a.id=i.article_id WHERE a.site_id=$1 AND a.slug=$2 AND a.status='published'`, false, site, r.PathValue("slug"))
+	serveImage(w, r, a.DB, `SELECT i.mime,i.data,i.alt FROM article_images i JOIN articles a ON a.id=i.article_id WHERE a.site_id=$1 AND (a.slug=$2 OR a.id IN (SELECT article_id FROM article_slug_aliases WHERE site_id=a.site_id AND old_slug=$2)) AND a.status='published'`, false, site, r.PathValue("slug"))
 }

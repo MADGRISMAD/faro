@@ -65,6 +65,11 @@ func TestAPIv1EntregaSoloDatos(t *testing.T) {
 	if code != 200 || len(ld) != 2 || ld[0].(map[string]any)["@type"] != "BlogPosting" || ld[1].(map[string]any)["@type"] != "FAQPage" {
 		t.Fatalf("artículo: %d %#v", code, post["jsonld"])
 	}
+	// una dirección anterior sigue resolviendo y responde con la dirección actual
+	app.DB.Exec(`INSERT INTO article_slug_aliases(site_id,old_slug,article_id) SELECT site_id,'direccion-anterior',id FROM articles WHERE site_id=(SELECT id FROM sites WHERE domain=$1) AND slug=$2`, domain, slug)
+	if code, old, _ := request(t, srv, "GET", "/v1/"+domain+"/posts/direccion-anterior", nil, "", "", ""); code != 200 || old["slug"] != slug {
+		t.Fatalf("alias: %d %v", code, old["slug"])
+	}
 	if rm, _ := post["reading_minutes"].(float64); rm < 1 {
 		t.Fatalf("minutos de lectura del artículo: %#v", post["reading_minutes"])
 	}
