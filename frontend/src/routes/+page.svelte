@@ -285,7 +285,7 @@
 
 <style>
 	.faro{
-		--bg:#f8f1f3;--ink:#1f1424;--body:#5d4d61;--soft:#6b5a6e;--crimson:#c2185b;--pink:#e8336d;--tint:#ffe3ec;
+		--bg:#fcfafb;--ink:#1f1424;--body:#5d4d61;--soft:#6b5a6e;--crimson:#c2185b;--pink:#e8336d;--tint:#ffe3ec;
 		--sh:12px 16px 34px rgba(188,128,158,.27),-12px -12px 28px rgba(255,255,255,.96);
 		--sh-s:6px 8px 18px rgba(188,128,158,.27),-6px -6px 14px rgba(255,255,255,.96);
 		--in:inset 6px 7px 15px rgba(188,128,158,.24),inset -6px -6px 14px rgba(255,255,255,.96);

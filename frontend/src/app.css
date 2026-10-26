@@ -4,7 +4,7 @@
    Las piezas son del MISMO color del fondo: el volumen sale de dos sombras (luz arriba a la izquierda, sombra rosa abajo
    a la derecha). Lo hundido es la misma sombra hacia adentro. Sin grises: fondo, sombras y textos son tonos rosa y ciruela. */
 :root{
-	--bg:#f8f1f3;--surface:#f8f1f3;--well:#f8f1f3;
+	--bg:#fcfafb;--surface:#fcfafb;--well:#fcfafb;
 	--ink:#1f1424;--mut:#6b5a6e; /* ciruela oscuro y malva: mismos tonos de la portada */
 	--accent:#c2185b;--accent-d:#9d1049;--accent-l:#f6a9c4;--accent-xl:#ffe3ec;
 	--warm:188,128,158; /* base de la sombra oscura: rosa */
