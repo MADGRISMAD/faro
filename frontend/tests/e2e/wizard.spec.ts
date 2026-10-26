@@ -50,4 +50,21 @@ test('asistente de Brand DNA: la IA sugiere, el cliente ajusta y solo al confirm
 	expect(saved.research.business).toBe('Taller mecánico familiar con 20 años en Tijuana.'); // lo que editó el cliente
 	expect(saved.research.topics).toHaveLength(4); // el tema que quitó ya no está
 	await expect(page.getByText('Escribiendo ahora').or(page.locator('.post').first()).first()).toBeVisible({ timeout: 30000 });
+	// la página de inicio ya con la cola, el calendario y el primer artículo escrito por la IA
+	await page.setViewportSize({ width: 1440, height: 900 });
+	await expect(page.getByRole('link', { name: 'Ver borrador' })).toBeVisible({ timeout: 40000 }); // el texto simulado es corto: queda en borrador, como debe
+	await page.evaluate(async () => { // se aprueba y publica para ver también la tarjeta del último artículo
+		const h = { 'content-type': 'application/json', 'x-csrf-token': localStorage.getItem('faro_csrf') || '' };
+		const [a] = await (await fetch('/api/articles')).json();
+		const ok = (await fetch(`/api/articles/${a.id}/approve`, { method: 'POST', headers: h })).status;
+		const pub = (await fetch(`/api/articles/${a.id}/publish`, { method: 'POST', headers: h })).status;
+		return [ok, pub];
+	}).then((st) => expect(st).toEqual([200, 200]));
+	await page.reload();
+	await page.waitForTimeout(2500);
+	await page.screenshot({ path: '/tmp/wiz-debug.png', fullPage: true });
+	await expect(page.locator('.latest')).toBeVisible({ timeout: 20000 });
+	await expect(page.locator('.qitem').first()).toBeVisible();
+	await expect(page.locator('.mc .day.on').first()).toBeVisible();
+	await page.screenshot({ path: '../screenshots/panel-inicio-completo.png', fullPage: true });
 });
