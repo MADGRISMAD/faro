@@ -396,6 +396,14 @@ func (a *App) runResearch(ctx context.Context, j *WorkItem) {
 	}
 	if e := a.finishResearch(ctx, j, r, fetchErr, final); e != nil {
 		slog.Error("No se pudo completar la investigación", "error", e)
+		return
+	}
+	if fetchErr == nil && r.Err == nil && dfsEnabled() { // datos reales de las palabras clave de los temas (mejor esfuerzo: si falla, el sitio sigue)
+		kctx, stop := context.WithTimeout(ctx, 40*time.Second)
+		defer stop()
+		if _, e := a.enrichKeywords(kctx, j.Site); e != nil {
+			slog.Warn("Palabras clave sin datos", "site", j.Site, "error", e)
+		}
 	}
 }
 
@@ -511,7 +519,7 @@ func (a *App) autopilotTick(ctx context.Context) error {
 		if e = a.DB.QueryRowContext(ctx, `SELECT budget_microusd-spent_microusd-reserved_microusd>=$1 FROM tenants WHERE id=$2`, reserveAmount(a.Config), d.tenant).Scan(&ok); e != nil || !ok {
 			continue // sin presupuesto no se encola nada
 		}
-		for _, t := range p.Topics {
+		for _, t := range a.rankTopics(ctx, p.Topics) {
 			var used bool
 			if e = a.DB.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM jobs WHERE tenant_id=$1 AND idempotency_key=$2)`, d.tenant, topicKey(d.site, t.Title)).Scan(&used); e != nil {
 				return e
@@ -877,7 +885,7 @@ func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
 		if next.Before(time.Now()) {
 			next = time.Now().Add(time.Hour)
 		}
-		for _, tp := range p.Topics {
+		for _, tp := range a.rankTopics(r.Context(), p.Topics) {
 			var used bool
 			if e = a.DB.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM jobs WHERE tenant_id=$1 AND idempotency_key=$2)`, t, topicKey(site, tp.Title)).Scan(&used); e != nil {
 				dbError(w, e)
@@ -935,7 +943,7 @@ func (a *App) confirmBrand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if auto && enough { // un sitio nuevo arranca con UN artículo; el resto sigue el ritmo (ver autopilotTick)
-		if e = enqueueTopic(r.Context(), tx, t, site, p, p.Topics[0]); e != nil {
+		if e = enqueueTopic(r.Context(), tx, t, site, p, a.rankTopics(r.Context(), p.Topics)[0]); e != nil {
 			dbError(w, e)
 			return
 		}

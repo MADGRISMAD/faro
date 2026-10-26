@@ -104,3 +104,9 @@ body.in-app>div>header{display:none}
 @media(max-width:700px){header{margin:12px;padding:12px 18px;flex-wrap:wrap}main{padding:25px 20px 80px}.hero{grid-template-columns:1fr;padding-top:15px}.panel-title{align-items:flex-start;flex-direction:column}nav{gap:12px}}
 input[type=checkbox]{accent-color:var(--accent)}
 .kw{font-weight:500}.kw b{font-weight:800}
+.btn.danger{background:var(--surface);color:#a30b45;box-shadow:var(--out-s)}.btn.danger:not(:disabled):hover{background:#a30b45;color:#fff}.btn.danger:disabled{opacity:.45;cursor:not-allowed}
+.danger-zone{box-shadow:var(--out),0 0 0 2px var(--accent-l)}
+table.data{width:100%;border-collapse:collapse;font-size:.9rem}table.data th{text-align:left;font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);padding:8px 10px}
+table.data td{padding:11px 10px;border-top:3px solid var(--well)}table.data .r{text-align:right;font-variant-numeric:tabular-nums}
+.kd{display:inline-block;min-width:34px;text-align:center;font-size:.76rem;font-weight:800;border-radius:99px;padding:3px 9px;box-shadow:var(--out-s);background:var(--surface)}
+.kd.easy{background:var(--ink);color:var(--surface)}.kd.medium{background:var(--accent-xl);color:var(--accent-d)}.kd.hard{background:var(--accent);color:var(--ink)}

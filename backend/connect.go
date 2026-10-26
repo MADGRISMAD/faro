@@ -123,3 +123,63 @@ func (a *App) verifySite(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, 200, map[string]any{"connected": okConn, "reason": why})
 }
+
+// deleteSite borra un sitio con todo lo suyo (artículos, imágenes, trabajos). Pide escribir el dominio para evitar accidentes
+// y se niega si hay algo escribiéndose, para no dejar reservas de presupuesto colgadas.
+func (a *App) deleteSite(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := a.auth(w, r, true)
+	if !ok {
+		return
+	}
+	site, ok := requireUUID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	tx, e := a.DB.BeginTx(r.Context(), nil)
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	defer tx.Rollback()
+	var domain string
+	e = tx.QueryRowContext(r.Context(), `SELECT domain FROM sites WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, site, t).Scan(&domain)
+	if errors.Is(e, sql.ErrNoRows) {
+		fail(w, 404, "Sitio no encontrado")
+		return
+	}
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	if strings.TrimPrefix(strings.ToLower(strings.TrimSpace(r.URL.Query().Get("confirm"))), "www.") != domain {
+		fail(w, 400, "Escribe el dominio del sitio para confirmar que quieres quitarlo")
+		return
+	}
+	var running int
+	if e = tx.QueryRowContext(r.Context(), `SELECT count(*) FROM jobs WHERE site_id=$1 AND status='running'`, site).Scan(&running); e != nil {
+		dbError(w, e)
+		return
+	}
+	if running > 0 {
+		fail(w, 409, "La IA está escribiendo algo para este sitio. Intenta de nuevo en un minuto.")
+		return
+	}
+	// Los cobros ya hechos quedan en el consumo del cliente (tenants.spent); aquí solo se borra el detalle por trabajo.
+	for _, q := range []string{
+		`UPDATE jobs SET article_id=NULL WHERE site_id=$1`,
+		`DELETE FROM articles WHERE site_id=$1`,
+		`DELETE FROM usage_events WHERE job_id IN (SELECT id FROM jobs WHERE site_id=$1)`,
+		`DELETE FROM jobs WHERE site_id=$1`,
+		`DELETE FROM sites WHERE id=$1`,
+	} {
+		if _, e = tx.ExecContext(r.Context(), q, site); e != nil {
+			dbError(w, e)
+			return
+		}
+	}
+	if e = tx.Commit(); e != nil {
+		dbError(w, e)
+		return
+	}
+	jsonResponse(w, 200, map[string]any{"ok": true})
+}

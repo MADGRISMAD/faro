@@ -149,6 +149,13 @@ func migrate(db *sql.DB) error {
 	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
 		return e
 	}
+	b, readErr = migrations.ReadFile("migrations/20261029000000_data.sql")
+	if readErr != nil {
+		return readErr
+	}
+	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
+		return e
+	}
 	return tx.Commit()
 }
 func main() {

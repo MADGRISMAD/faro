@@ -136,6 +136,7 @@
 				<span class="soon">Redes sociales <span class="tag">Pronto</span></span>
 				<span class="soon">Google Business <span class="tag">Pronto</span></span>
 				<div class="group">Datos</div>
+				<a href="/dashboard/analytics" class:on={path === '/dashboard/analytics'} on:click={() => (path = '/dashboard/analytics')}>Analytics</a>
 				<a href="/dashboard/palabras-clave" class:on={path === '/dashboard/palabras-clave'} on:click={() => (path = '/dashboard/palabras-clave')}>Palabras clave</a>
 			</nav>
 			<div class="foot">

@@ -2,6 +2,7 @@
 	import { api } from '#lib/api';
 	import { sites, siteId, research, user, refreshSite, loadSites } from '#lib/app';
 
+	let confirmText = '', removing = false;
 	let error = '', notice = '', canonical = '', prefix = '/blog', loaded = '';
 	$: if (site && loaded !== site.id) {
 		loaded = site.id;
@@ -21,6 +22,20 @@
 	}
 	$: site = $sites.find((s) => s.id === $siteId);
 	$: left = $user ? ($user.budget_microusd - $user.spent_microusd - $user.reserved_microusd) / 1e6 : 0;
+	async function removeSite() {
+		if (!site) return;
+		removing = true;
+		error = notice = '';
+		try {
+			await api(`/sites/${site.id}?confirm=${encodeURIComponent(confirmText)}`, { method: 'DELETE' });
+			confirmText = '';
+			await loadSites();
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			removing = false;
+		}
+	}
 	async function perWeek(n: number) {
 		error = '';
 		try {
@@ -61,8 +76,17 @@
 		</div>
 	</section>
 
-	<section class="panel">
+	<section class="panel" style="margin-bottom:18px">
 		<h2 style="font-size:1.25rem;margin:0 0 4px">Uso de IA</h2>
 		<p class="muted" style="margin:0">Crédito disponible: <b>US${left.toFixed(2)}</b> · consumido: US${($user?.spent_microusd / 1e6 || 0).toFixed(3)}. Cada artículo con su imagen cuesta alrededor de US$0.05.</p>
+	</section>
+
+	<section class="panel danger-zone">
+		<h2 style="font-size:1.25rem;margin:0 0 4px;color:var(--accent-d)">Quitar este sitio</h2>
+		<p class="muted" style="margin-top:0">Se borran sus artículos, imágenes y planes. No se puede deshacer. Lo que ya gastaste en IA se conserva en tu consumo. El blog que tengas en tu dominio dejará de recibir datos.</p>
+		<form class="stack" on:submit|preventDefault={removeSite}>
+			<label>Escribe <b>{site?.domain}</b> para confirmar<input bind:value={confirmText} autocomplete="off" autocapitalize="off" spellcheck="false" /></label>
+			<div><button class="btn danger" disabled={removing || confirmText.trim().toLowerCase().replace(/^www\./, '') !== site?.domain}>{removing ? 'Quitando…' : 'Quitar este sitio'}</button></div>
+		</form>
 	</section>
 </div>

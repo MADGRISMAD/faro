@@ -346,3 +346,69 @@ func TestAutoVerificaLaConexionSola(t *testing.T) {
 		t.Fatal("no detectó la conexión sola")
 	}
 }
+
+func TestQuitarSitio(t *testing.T) {
+	minAutoWords = 0
+	defer func() { minAutoWords = 500 }()
+	app := testApp(t)
+	app.Config.ImageModel, app.Config.ImageRate = "mock", 30000
+	srv := httptest.NewServer(app.Routes())
+	defer srv.Close()
+	cookie, csrf, tenant := registerTest(t, srv)
+	otherCookie, otherCSRF, _ := registerTest(t, srv)
+	domain := "quitar-" + token()[:8] + ".test"
+	_, res, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": domain}, cookie, csrf, "")
+	siteID := res["site_id"].(string)
+	app.DB.Exec(`UPDATE jobs SET status='failed' WHERE site_id=$1`, siteID)
+	app.DB.Exec(`UPDATE sites SET autopilot=true WHERE id=$1`, siteID)
+	var jobID string
+	app.DB.QueryRow(`INSERT INTO jobs(tenant_id,site_id,idempotency_key,topic,business,audience,kind) VALUES($1,$2,$3,'Tema','Negocio','Público','article') RETURNING id`, tenant, siteID, token()).Scan(&jobID)
+	var j *WorkItem
+	for i := 0; i < 40; i++ {
+		j, _ = app.claim(context.Background())
+		if j == nil || (j.Tenant == tenant && j.Kind == "article") {
+			break
+		}
+	}
+	if j == nil {
+		t.Fatal("sin job")
+	}
+	// mientras se escribe no se puede quitar
+	if code, _, _ := request(t, srv, "DELETE", "/sites/"+siteID+"?confirm="+domain, nil, cookie, csrf, ""); code != 409 {
+		t.Fatalf("quitar con un trabajo en curso: %d", code)
+	}
+	if e := app.finish(context.Background(), j, app.Provider.Create(context.Background(), j.Prompt, app.Config)); e != nil {
+		t.Fatal(e)
+	}
+	var spentBefore int64
+	app.DB.QueryRow(`SELECT spent_microusd FROM tenants WHERE id=$1`, tenant).Scan(&spentBefore)
+	if code, _, _ := request(t, srv, "DELETE", "/sites/"+siteID, nil, cookie, csrf, ""); code != 400 {
+		t.Fatalf("sin confirmar el dominio: %d", code)
+	}
+	if code, _, _ := request(t, srv, "DELETE", "/sites/"+siteID+"?confirm="+domain, nil, otherCookie, otherCSRF, ""); code != 404 {
+		t.Fatalf("quitar el sitio de otro: %d", code)
+	}
+	if code, _, _ := request(t, srv, "DELETE", "/sites/"+siteID+"?confirm="+domain, nil, cookie, "", ""); code != 403 {
+		t.Fatalf("sin CSRF: %d", code)
+	}
+	if code, _, _ := request(t, srv, "DELETE", "/sites/"+siteID+"?confirm=WWW."+strings.ToUpper(domain), nil, cookie, csrf, ""); code != 200 {
+		t.Fatalf("quitar: %d", code)
+	}
+	var sites, arts, jobs int
+	app.DB.QueryRow(`SELECT count(*) FROM sites WHERE id=$1`, siteID).Scan(&sites)
+	app.DB.QueryRow(`SELECT count(*) FROM articles WHERE site_id=$1`, siteID).Scan(&arts)
+	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1`, siteID).Scan(&jobs)
+	if sites+arts+jobs != 0 {
+		t.Fatalf("quedaron restos: sitios=%d artículos=%d jobs=%d", sites, arts, jobs)
+	}
+	var spentAfter int64
+	app.DB.QueryRow(`SELECT spent_microusd FROM tenants WHERE id=$1`, tenant).Scan(&spentAfter)
+	if spentAfter != spentBefore {
+		t.Fatalf("el consumo ya cobrado no debe cambiar al quitar el sitio: %d -> %d", spentBefore, spentAfter)
+	}
+	// el mismo dominio se puede volver a dar de alta
+	if code, _, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": domain}, cookie, csrf, ""); code != 200 {
+		t.Fatalf("volver a agregar el dominio: %d", code)
+	}
+	app.DB.Exec(`UPDATE jobs SET status='failed' WHERE tenant_id=$1 AND status IN ('queued','running')`, tenant)
+}
