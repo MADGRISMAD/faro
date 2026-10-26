@@ -83,10 +83,10 @@ export function stopPolling() {
 export const statusName: Record<string, string> = { draft: 'Borrador', approved: 'Aprobado', published: 'Publicado' };
 export const intentName: Record<string, string> = { informational: 'Informativo', comparison: 'Comparación', purchase: 'Compra', local: 'Local' };
 export const imageStyles: { id: string; name: string; hint: string }[] = [
-	{ id: 'clean', name: 'Limpio y minimalista', hint: 'Ilustraciones planas y profesionales' },
-	{ id: 'photo', name: 'Fotorrealista', hint: 'Imágenes tipo foto de stock' },
-	{ id: 'watercolor', name: 'Acuarela', hint: 'Estética de pintura artística' },
-	{ id: '3d', name: 'Render 3D', hint: 'Ilustraciones 3D modernas' },
-	{ id: 'vintage', name: 'Vintage', hint: 'Estilo retro clásico' },
-	{ id: 'abstract', name: 'Abstracto', hint: 'Formas atrevidas y colores intensos' }
+	{ id: 'clean', name: 'Limpio y minimalista', hint: 'Ilustración plana, como de revista' },
+	{ id: 'photo', name: 'Fotorrealista', hint: 'Fotografía editorial con luz natural' },
+	{ id: 'watercolor', name: 'Acuarela', hint: 'Pintura suave sobre papel' },
+	{ id: '3d', name: 'Render 3D', hint: 'Figuras tipo arcilla o juguete' },
+	{ id: 'vintage', name: 'Vintage', hint: 'Cartel retro con trama de puntos' },
+	{ id: 'abstract', name: 'Abstracto', hint: 'Formas y colores intensos' }
 ];

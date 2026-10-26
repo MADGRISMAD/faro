@@ -92,7 +92,7 @@
 			<div class="row"><div><b>Crear una imagen de portada para cada artículo</b><br /><span class="muted small">Ilustración sin texto. Cuesta unos US$0.05 por artículo con su imagen.</span></div>
 				<label class="switch"><input type="checkbox" bind:checked={images} /></label></div>
 			{#if images}
-				<div class="tiles" style="margin-top:18px">{#each imageStyles as s}<button class="tile" class:on={style === s.id} on:click={() => (style = s.id)}><b>{s.name}</b><small>{s.hint}</small></button>{/each}</div>
+				<div class="tiles" style="margin-top:18px">{#each imageStyles as s}<button class="tile" class:on={style === s.id} on:click={() => (style = s.id)}><img class="sample" src="/estilos/{s.id}.jpg" width="480" height="270" loading="lazy" alt="Muestra del estilo {s.name}" /><b>{s.name}</b><small>{s.hint}</small></button>{/each}</div>
 				<label style="margin-top:16px">Instrucciones de imagen <span class="muted small">(opcional)</span><input bind:value={notes} maxlength="300" placeholder="Por ejemplo: siempre incluir plantas, colores cálidos" /></label>
 			{/if}
 		{:else if step === 4}

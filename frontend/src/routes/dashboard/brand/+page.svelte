@@ -78,7 +78,7 @@
 					<div class="head"><b>Estilo de imagen</b></div>
 					<div class="tiles">
 						{#each imageStyles as s}
-							<button class="tile" class:on={$research?.image_style === s.id} on:click={() => patch({ image_style: s.id })}><b>{s.name}</b><small>{s.hint}</small></button>
+							<button class="tile" class:on={$research?.image_style === s.id} on:click={() => patch({ image_style: s.id })}><img class="sample" src="/estilos/{s.id}.jpg" width="480" height="270" loading="lazy" alt="Muestra del estilo {s.name}" /><b>{s.name}</b><small>{s.hint}</small></button>
 						{/each}
 					</div>
 				</div>

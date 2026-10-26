@@ -26,14 +26,15 @@ const imageReserve = 60000 // US$0.06 por imagen: margen sobre los ~US$0.034 que
 
 type ImagePrompt struct{ Title, Business, Audience, Tone, Style, Notes string }
 
-// Estilos que el cliente puede elegir en Brand DNA.
+// Estilos que el cliente puede elegir en Brand DNA. Cada uno describe técnica, luz y textura, no solo un adjetivo:
+// así dos portadas del mismo sitio se ven de la misma serie. Las muestras del selector (static/estilos/) salieron de aquí.
 var imageStyles = map[string]string{
-	"clean":      "ilustración vectorial plana, moderna y limpia, paleta suave y armónica",
-	"photo":      "fotografía de stock realista, luz natural, composición profesional, sin personas reconocibles",
-	"watercolor": "pintura acuarela artística, colores suaves, textura de papel",
-	"3d":         "render 3D moderno con formas suaves e iluminación de estudio",
-	"vintage":    "estilo retro clásico, paleta cálida, textura de impresión antigua",
-	"abstract":   "formas geométricas abstractas y atrevidas, colores intensos, composición dinámica",
+	"clean":      "ilustración editorial vectorial plana, formas geométricas limpias, sombras planas suaves y un grano fino sutil, como la portada de una revista de negocios moderna",
+	"photo":      "fotografía editorial realista, luz natural lateral suave, poca profundidad de campo (lente de 35 mm), colores naturales; si aparecen personas, de espaldas, de perfil o solo sus manos, nunca rostros de frente",
+	"watercolor": "pintura en acuarela sobre papel de grano grueso, manchas que se difuminan en los bordes, contornos finos de tinta y mucho blanco del papel",
+	"3d":         "render 3D estilizado tipo arcilla o juguete, formas redondeadas, materiales mate, luz de estudio suave con sombras de contacto y fondo de un solo color",
+	"vintage":    "ilustración retro de mediados del siglo XX, impresión serigráfica con trama de puntos, paleta cálida limitada y textura de papel envejecido",
+	"abstract":   "cartel moderno con formas geométricas y orgánicas que sugieren el tema, colores intensos y contrastados, composición dinámica",
 }
 
 type ImageResult struct {
@@ -50,9 +51,17 @@ func imageText(p ImagePrompt) string {
 	}
 	notes := ""
 	if n := strings.TrimSpace(p.Notes); n != "" {
-		notes = " Instrucciones de la marca: " + clean(n, 300) + "."
+		notes = "\nIndicaciones de la marca (tienen prioridad sobre el estilo): " + clean(n, 300) + "."
 	}
-	return fmt.Sprintf("Crea una imagen horizontal sin ningún texto que represente visualmente este tema de blog: %s (el tema es solo referencia: NO escribas el título ni ninguna palabra en la imagen). Negocio: %s. Público: %s. Estilo: %s, composición clara con un solo elemento central, mucho aire. Si el tema compara dos opciones, represéntalas solo con objetos y composición, sin etiquetas ni rótulos.%s Prohibido absolutamente: texto, letras, palabras, números, logotipos, marcas de agua, pantallas con texto.", p.Title, p.Business, p.Audience, style, notes)
+	return fmt.Sprintf(`Portada para un artículo de blog, formato horizontal 16:9.
+Tema del artículo (solo para saber qué mostrar; NO lo escribas en la imagen): %s
+Negocio: %s. Lectores: %s.
+Qué mostrar: una escena concreta que los lectores reconozcan de su día a día con este tema: el objeto, el lugar o el momento real del que trata (por ejemplo el mostrador de una tienda, unas manos cobrando con una terminal, la cocina de un restaurante), no ideas abstractas. Un solo sujeto principal que se entienda a primera vista, con detalles que lo hagan propio de México cuando aplique. Si el tema compara dos opciones, muéstralas lado a lado solo con objetos.
+Composición: sujeto un poco fuera del centro, fondo sencillo y aire alrededor para que se pueda recortar a cuadrado sin perder lo importante; profundidad entre primer plano y fondo.
+Estilo: %s.
+Color: paleta limitada de 3 o 4 tonos armónicos con un color de acento y buena separación entre sujeto y fondo.
+Evita: personas sonriendo a la cámara, apretones de manos, gente señalando pantallas, hologramas, cerebros o robots genéricos de «inteligencia artificial», engranes, focos, flechas de crecimiento, gráficas de adorno, monedas flotando y oficinas genéricas.%s
+Prohibido absolutamente: texto, letras, palabras, números, logotipos, marcas de agua, letreros y pantallas con texto legible.`, p.Title, p.Business, p.Audience, style, notes)
 }
 
 func (*Mock) Image(_ context.Context, _ ImagePrompt, _ Config) ImageResult {
