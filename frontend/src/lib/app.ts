@@ -8,7 +8,7 @@ export type Research = {
 	status: string; error: string; autopilot: boolean; auto_publish: boolean; posts_per_week: number;
 	articles_pending: number; articles_done: number; images_pending: number;
 	images_enabled: boolean; image_style: string; image_notes: string; avoid_topics: string; research?: Profile;
-	connected: boolean; blog_base: string; hosted_url: string; domain: string; canonical_url: string; blog_prefix: string;
+	brand_confirmed: boolean; connected: boolean; blog_base: string; hosted_url: string; domain: string; canonical_url: string; blog_prefix: string;
 };
 export type Article = {
 	id: string; site_id: string; title: string; slug: string; meta_description: string; summary: string; status: string; has_image: boolean; published_at: string | null;

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import Wizard from '../../lib/Wizard.svelte';
 	import { api } from '#lib/api';
 	import { user, ready, sites, siteId, addingSite, research, boot, loadSites, selectSite, stopPolling } from '#lib/app';
 
@@ -64,6 +65,9 @@
 	let path = '';
 	const here = () => (path = location.pathname.replace(/\/$/, ''));
 	$: active = $sites.find((s) => s.id === $siteId);
+	// Un sitio que la IA acaba de analizar espera a que el cliente revise su Brand DNA antes de escribir nada.
+	$: settingUp = !!$research && !$research.brand_confirmed;
+	$: reading = settingUp && ($research?.status === 'queued' || $research?.status === 'running');
 </script>
 
 <svelte:head><title>FaroContenido</title><meta name="robots" content="noindex" /></svelte:head>
@@ -101,6 +105,20 @@
 		{#if error}<p class="error" role="alert">{error}</p>{/if}
 		{#if $addingSite && $sites.length}<button class="btn secondary" style="margin-top:14px" on:click={() => addingSite.set(false)}>Cancelar</button>{/if}
 	</main>
+{:else if reading}
+	<main style="max-width:640px">
+		<p class="eyebrow">{active?.domain}</p>
+		<h1 style="font-size:2.4rem">Leyendo tu sitio…</h1>
+		<div class="panel" role="status"><span class="spin"></span>La IA está entendiendo tu negocio y eligiendo los temas. Tarda menos de un minuto; después podrás revisar todo antes de que escriba nada.</div>
+	</main>
+{:else if settingUp && $research?.status === 'failed'}
+	<main style="max-width:640px">
+		<h1 style="font-size:2.2rem">No pude leer tu sitio</h1>
+		<p class="error" role="alert">{$research?.error}</p>
+		<button class="btn" on:click={() => addingSite.set(true)}>Probar con otra dirección</button>
+	</main>
+{:else if settingUp && $research?.status === 'done'}
+	<Wizard />
 {:else}
 	<div class="shell">
 		<aside class="side">

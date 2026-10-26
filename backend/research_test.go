@@ -79,7 +79,7 @@ func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
 	srv := httptest.NewServer(app.Routes())
 	defer srv.Close()
 	cookie, csrf, tenant := registerTest(t, srv)
-	otherCookie, _, _ := registerTest(t, srv)
+	otherCookie, otherCSRF, _ := registerTest(t, srv)
 	if code, _, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": "tusitio"}, cookie, csrf, ""); code != 400 {
 		t.Fatalf("url inválida: %d", code)
 	}
@@ -120,8 +120,51 @@ func TestInvestigacionAutomaticaYAutopiloto(t *testing.T) {
 	var pending int
 	app.DB.QueryRow(`SELECT name,tone FROM sites WHERE id=$1`, siteID).Scan(&name, &tone)
 	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1 AND kind='article' AND status='queued'`, siteID).Scan(&pending)
-	if name != "Taller Rápido" || tone == "" || pending != 1 {
-		t.Fatalf("sitio: %q %q, %d artículos en cola", name, tone, pending)
+	if name != "Taller Rápido" || tone == "" || pending != 0 {
+		t.Fatalf("sitio: %q %q, %d artículos en cola (no debe escribir nada antes de que el cliente confirme su Brand DNA)", name, tone, pending)
+	}
+	if st["brand_confirmed"] != false {
+		t.Fatalf("debía esperar confirmación: %#v", st)
+	}
+	// aunque pase el tiempo, el autopiloto no escribe mientras el Brand DNA no esté confirmado
+	app.DB.Exec(`UPDATE sites SET research=NULL WHERE id<>$1`, siteID)
+	if e := app.autopilotTick(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1 AND kind='article'`, siteID).Scan(&pending)
+	if pending != 0 {
+		t.Fatalf("el autopiloto escribió sin confirmación: %d", pending)
+	}
+	if code, _, _ := request(t, srv, "POST", "/sites/"+siteID+"/brand/confirm", map[string]any{}, otherCookie, otherCSRF, ""); code != 404 {
+		t.Fatalf("confirmar el sitio ajeno: %d", code)
+	}
+	// el cliente ajusta lo sugerido: quitar temas (mínimo 3) y cambiar el tono
+	topics := st["research"].(map[string]any)["topics"].([]any)
+	first := topics[0].(map[string]any)["title"].(string)
+	if code, _, _ := request(t, srv, "PATCH", "/sites/"+siteID+"/brand", map[string]any{"remove_topics": []string{first, topics[1].(map[string]any)["title"].(string), topics[2].(map[string]any)["title"].(string)}}, cookie, csrf, ""); code != 400 {
+		t.Fatalf("dejar menos de 3 temas debía rechazarse: %d", code)
+	}
+	if code, _, _ := request(t, srv, "PATCH", "/sites/"+siteID+"/brand", map[string]any{"remove_topics": []string{first}, "tone": "Muy directo", "auto_publish": true}, cookie, csrf, ""); code != 200 {
+		t.Fatalf("ajustes del asistente: %d", code)
+	}
+	if code, _, _ := request(t, srv, "POST", "/sites/"+siteID+"/brand/confirm", map[string]any{}, cookie, csrf, ""); code != 200 {
+		t.Fatalf("confirmar: %d", code)
+	}
+	var queuedTopic string
+	app.DB.QueryRow(`SELECT topic FROM jobs WHERE site_id=$1 AND kind='article' AND status='queued'`, siteID).Scan(&queuedTopic)
+	if queuedTopic == "" || queuedTopic == first {
+		t.Fatalf("el primer artículo debe salir del primer tema que NO se quitó: %q (quitado: %q)", queuedTopic, first)
+	}
+	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1 AND kind='article' AND status='queued'`, siteID).Scan(&pending)
+	if pending != 1 {
+		t.Fatalf("tras confirmar debe haber 1 artículo en cola: %d", pending)
+	}
+	if code, _, _ := request(t, srv, "POST", "/sites/"+siteID+"/brand/confirm", map[string]any{}, cookie, csrf, ""); code != 200 {
+		t.Fatal("confirmar dos veces debe ser inocuo")
+	}
+	app.DB.QueryRow(`SELECT count(*) FROM jobs WHERE site_id=$1 AND kind='article'`, siteID).Scan(&pending)
+	if pending != 1 {
+		t.Fatalf("confirmar dos veces duplicó el artículo: %d", pending)
 	}
 	var spent int64
 	app.DB.QueryRow(`SELECT spent_microusd FROM tenants WHERE id=$1`, tenant).Scan(&spent)

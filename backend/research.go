@@ -456,20 +456,12 @@ func (a *App) finishResearch(ctx context.Context, j *WorkItem, r ResearchResult,
 	if _, e = tx.ExecContext(ctx, `UPDATE sites SET name=$1,brand_description=$2,tone=$3,research=$4,canonical_url=CASE WHEN $5<>'' AND replace(replace(lower($5),'https://',''),'http://','') IN (domain,'www.'||domain) THEN $5 ELSE canonical_url END WHERE id=$6`, p.Name, clean(brand, 1500), p.Tone, blob, canonical, j.Site); e != nil {
 		return e
 	}
-	var auto bool
-	if e = tx.QueryRowContext(ctx, `SELECT autopilot FROM sites WHERE id=$1`, j.Site).Scan(&auto); e != nil {
-		return e
-	}
 	if p.Sensitive { // sector de salud, legal o finanzas: todo queda en borrador para revisión humana
 		if _, e = tx.ExecContext(ctx, `UPDATE sites SET auto_publish=false WHERE id=$1`, j.Site); e != nil {
 			return e
 		}
 	}
-	if auto { // un sitio nuevo arranca con UN artículo; el resto sigue el ritmo (ver autopilotTick)
-		if e = enqueueTopic(ctx, tx, j.Tenant, j.Site, p, p.Topics[0]); e != nil {
-			return e
-		}
-	}
+	// No se escribe nada todavía: el cliente primero revisa su Brand DNA en el asistente (ver confirmBrand).
 	if _, e = tx.ExecContext(ctx, `UPDATE jobs SET status='done',reserved_microusd=0,error_message=NULL,updated_at=now() WHERE id=$1`, j.ID); e != nil {
 		return e
 	}
@@ -489,7 +481,7 @@ func enqueueTopic(ctx context.Context, tx *sql.Tx, tenant, site string, p Profil
 
 // autopilotTick: por cada sitio con autopiloto, mantiene el ritmo semanal con el siguiente tema sin usar.
 func (a *App) autopilotTick(ctx context.Context) error {
-	rows, e := a.DB.QueryContext(ctx, `SELECT s.id,s.tenant_id,s.posts_per_week,s.research FROM sites s WHERE s.autopilot AND s.research IS NOT NULL AND
+	rows, e := a.DB.QueryContext(ctx, `SELECT s.id,s.tenant_id,s.posts_per_week,s.research FROM sites s WHERE s.autopilot AND s.research IS NOT NULL AND s.brand_confirmed_at IS NOT NULL AND
 		(SELECT count(*) FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND j.created_at>now()-interval '7 days')<LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' THEN 1 ELSE 3 END) AND
 		NOT EXISTS(SELECT 1 FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND (j.status IN ('queued','running') OR j.created_at>now()-make_interval(hours => 168/LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' THEN 1 ELSE 3 END))))`)
 	if e != nil {
@@ -583,7 +575,7 @@ func (a *App) analyzeSite(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 	var site string
-	e = tx.QueryRowContext(r.Context(), `INSERT INTO sites(tenant_id,name,domain,canonical_url,autopilot) VALUES($1,$2,$3,$4,true) RETURNING id`, t, domain, domain, u.String()).Scan(&site)
+	e = tx.QueryRowContext(r.Context(), `INSERT INTO sites(tenant_id,name,domain,canonical_url,autopilot,brand_confirmed_at) VALUES($1,$2,$3,$4,true,NULL) RETURNING id`, t, domain, domain, u.String()).Scan(&site)
 	if e != nil {
 		var pg *pgconn.PgError
 		if errors.As(e, &pg) && pg.Code == "23505" {
@@ -613,10 +605,10 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var blob []byte
-	var auto, autoPublish, images, connected bool
+	var auto, autoPublish, images, connected, confirmed bool
 	var perWeek int
 	var avoid, imgStyle, imgNotes, canonical, prefix, domain string
-	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics,canonical_url,blog_prefix,domain,connected_at IS NOT NULL FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid, &canonical, &prefix, &domain, &connected)
+	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics,canonical_url,blog_prefix,domain,connected_at IS NOT NULL,brand_confirmed_at IS NOT NULL FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid, &canonical, &prefix, &domain, &connected, &confirmed)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -634,7 +626,7 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		dbError(w, e)
 		return
 	}
-	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String, "images_enabled": images, "image_style": imgStyle, "image_notes": imgNotes, "avoid_topics": avoid, "connected": connected, "blog_base": blogBase(connected, canonical, prefix, domain), "hosted_url": hostedBase(domain), "domain": domain, "canonical_url": canonical, "blog_prefix": prefix}
+	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String, "images_enabled": images, "image_style": imgStyle, "image_notes": imgNotes, "avoid_topics": avoid, "brand_confirmed": confirmed, "connected": connected, "blog_base": blogBase(connected, canonical, prefix, domain), "hosted_url": hostedBase(domain), "domain": domain, "canonical_url": canonical, "blog_prefix": prefix}
 	if blob != nil {
 		out["research"] = json.RawMessage(blob)
 	}
@@ -688,6 +680,8 @@ type brandPatch struct {
 	ImagesEnabled *bool     `json:"images_enabled"`
 	ImageStyle    *string   `json:"image_style"`
 	ImageNotes    *string   `json:"image_notes"`
+	AutoPublish   *bool     `json:"auto_publish"`
+	RemoveTopics  *[]string `json:"remove_topics"`
 }
 
 func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
@@ -711,8 +705,8 @@ func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 	var blob []byte
 	var avoid, notes, style string
-	var images bool
-	e = tx.QueryRowContext(r.Context(), `SELECT research,avoid_topics,image_notes,image_style,images_enabled FROM sites WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, site, t).Scan(&blob, &avoid, &notes, &style, &images)
+	var images, autoPublish bool
+	e = tx.QueryRowContext(r.Context(), `SELECT research,avoid_topics,image_notes,image_style,images_enabled,auto_publish FROM sites WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, site, t).Scan(&blob, &avoid, &notes, &style, &images, &autoPublish)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -751,6 +745,26 @@ func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
 	if x.ImagesEnabled != nil {
 		images = *x.ImagesEnabled
 	}
+	if x.AutoPublish != nil {
+		autoPublish = *x.AutoPublish && !p.Sensitive // en salud, legal o finanzas nada se publica sin revisión
+	}
+	if x.RemoveTopics != nil {
+		drop := map[string]bool{}
+		for _, title := range *x.RemoveTopics {
+			drop[strings.ToLower(strings.TrimSpace(title))] = true
+		}
+		kept := []Topic{}
+		for _, tp := range p.Topics {
+			if !drop[strings.ToLower(tp.Title)] {
+				kept = append(kept, tp)
+			}
+		}
+		if len(kept) < 3 {
+			fail(w, 400, "Deja al menos 3 temas para que la IA tenga de dónde escribir")
+			return
+		}
+		p.Topics = kept
+	}
 	if x.ImageStyle != nil {
 		if _, ok := imageStyles[*x.ImageStyle]; !ok {
 			fail(w, 400, "Estilo de imagen inválido")
@@ -774,7 +788,7 @@ func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
 	if blob != nil {
 		research = out
 	}
-	if _, e = tx.ExecContext(r.Context(), `UPDATE sites SET research=$1,brand_description=CASE WHEN $2<>'' THEN $2 ELSE brand_description END,tone=CASE WHEN $3<>'' THEN $3 ELSE tone END,avoid_topics=$4,image_notes=$5,image_style=$6,images_enabled=$7 WHERE id=$8`, research, clean(brand, 1500), p.Tone, avoid, notes, style, images, site); e != nil {
+	if _, e = tx.ExecContext(r.Context(), `UPDATE sites SET research=$1,brand_description=CASE WHEN $2<>'' THEN $2 ELSE brand_description END,tone=CASE WHEN $3<>'' THEN $3 ELSE tone END,avoid_topics=$4,image_notes=$5,image_style=$6,images_enabled=$7,auto_publish=$8 WHERE id=$9`, research, clean(brand, 1500), p.Tone, avoid, notes, style, images, autoPublish, site); e != nil {
 		dbError(w, e)
 		return
 	}
@@ -877,4 +891,58 @@ func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	jsonResponse(w, 200, map[string]any{"articles": articles, "generating": generating, "upcoming": upcoming})
+}
+
+// confirmBrand cierra el asistente: el Brand DNA queda aprobado por el cliente y, con el piloto encendido, se encola el primer artículo.
+func (a *App) confirmBrand(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := a.auth(w, r, true)
+	if !ok {
+		return
+	}
+	site, ok := requireUUID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	tx, e := a.DB.BeginTx(r.Context(), nil)
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	defer tx.Rollback()
+	var blob []byte
+	var auto bool
+	e = tx.QueryRowContext(r.Context(), `SELECT research,autopilot FROM sites WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, site, t).Scan(&blob, &auto)
+	if errors.Is(e, sql.ErrNoRows) {
+		fail(w, 404, "Sitio no encontrado")
+		return
+	}
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	var p Profile
+	if blob == nil || json.Unmarshal(blob, &p) != nil || len(p.Topics) == 0 {
+		fail(w, 409, "La IA todavía no termina de analizar el sitio")
+		return
+	}
+	if _, e = tx.ExecContext(r.Context(), `UPDATE sites SET brand_confirmed_at=COALESCE(brand_confirmed_at,now()) WHERE id=$1`, site); e != nil {
+		dbError(w, e)
+		return
+	}
+	var enough bool
+	if e = tx.QueryRowContext(r.Context(), `SELECT budget_microusd-spent_microusd-reserved_microusd>=$1 FROM tenants WHERE id=$2`, reserveAmount(a.Config), t).Scan(&enough); e != nil {
+		dbError(w, e)
+		return
+	}
+	if auto && enough { // un sitio nuevo arranca con UN artículo; el resto sigue el ritmo (ver autopilotTick)
+		if e = enqueueTopic(r.Context(), tx, t, site, p, p.Topics[0]); e != nil {
+			dbError(w, e)
+			return
+		}
+	}
+	if e = tx.Commit(); e != nil {
+		dbError(w, e)
+		return
+	}
+	jsonResponse(w, 200, map[string]any{"ok": true})
 }
