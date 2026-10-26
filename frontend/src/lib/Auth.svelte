@@ -144,7 +144,7 @@
 	.go{display:flex;align-items:center;justify-content:center;gap:10px;height:54px;border:0;border-radius:99px;background:var(--accent);color:#fff;font-weight:800;font-size:1.05rem;box-shadow:var(--puff);transition:background .25s,transform .12s}
 	.go:hover:not(:disabled){transform:translateY(-1px)}
 	.go:disabled{cursor:wait;opacity:1}
-	.go.ok{background:#15803d;box-shadow:6px 8px 18px rgba(21,128,61,.3),-5px -5px 12px var(--light)}
+	.go.ok{background:#15803d;box-shadow:none}
 	.check{stroke-width:3;animation:pop .3s}
 	.spinner{width:18px;height:18px;border:3px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
 	.swap{margin:20px 0 0;color:var(--mut);font-size:.92rem}

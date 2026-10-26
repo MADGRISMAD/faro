@@ -1,19 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Nunito:wght@400;500;600;700;800;900&display=swap');
 
-/* ───── Neumorfismo en rosa (mismo estilo que la portada) ─────
+/* ───── Estilo plano en rosa (mismo de la portada): superficies blancas con borde fino, sin relieve ─────
    Las piezas son del MISMO color del fondo: el volumen sale de dos sombras (luz arriba a la izquierda, sombra rosa abajo
    a la derecha). Lo hundido es la misma sombra hacia adentro. Sin grises: fondo, sombras y textos son tonos rosa y ciruela. */
 :root{
-	--bg:#fcfafb;--surface:#fcfafb;--well:#fcfafb;
+	--bg:#fcfafb;--surface:#ffffff;--well:#f6eff2;--line:#eadde3;
 	--ink:#1f1424;--mut:#6b5a6e; /* ciruela oscuro y malva: mismos tonos de la portada */
 	--accent:#c2185b;--accent-d:#9d1049;--accent-l:#f6a9c4;--accent-xl:#ffe3ec;
 	--warm:188,128,158; /* base de la sombra oscura: rosa */
 	--light:rgba(255,255,255,.96);
-	--out:12px 16px 34px rgba(var(--warm),.27),-12px -12px 28px var(--light);
-	--out-s:6px 8px 18px rgba(var(--warm),.27),-6px -6px 14px var(--light);
-	--in:inset 6px 7px 15px rgba(var(--warm),.24),inset -6px -6px 14px var(--light);
-	--in-s:inset 3px 4px 9px rgba(var(--warm),.26),inset -3px -3px 8px var(--light);
-	--puff:8px 10px 22px rgba(194,24,91,.34),-6px -6px 14px var(--light),inset 0 -3px 7px rgba(110,0,45,.28);
+	--out:0 0 0 1px var(--line);
+	--out-s:0 0 0 1px var(--line);
+	--in:inset 0 0 0 1px var(--line);
+	--in-s:inset 0 0 0 1px var(--line);
+	--puff:none;
 	font-family:'Nunito',sans-serif;color:var(--ink);background:var(--bg);font-synthesis:none
 }
 *{box-sizing:border-box}body{margin:0;background:var(--bg)}a{color:inherit}button,input,textarea,select{font:inherit}button{cursor:pointer}
@@ -33,7 +33,7 @@ input,textarea,select{width:100%;border:0;border-radius:18px;padding:13px 16px;b
 input::placeholder,textarea::placeholder{color:#b78aa0}
 textarea{min-height:110px;resize:vertical}
 .btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:99px;background:var(--accent);color:#fff;padding:13px 24px;font-weight:800;text-decoration:none;box-shadow:var(--puff);transition:transform .12s,box-shadow .12s}
-.btn:hover{transform:translateY(-1px)}.btn:active{transform:translateY(1px);box-shadow:inset 5px 5px 10px rgba(110,0,45,.4),inset -3px -3px 8px rgba(255,255,255,.2)}
+.btn:hover{transform:translateY(-1px)}.btn:active{transform:translateY(1px);filter:brightness(.94)}
 .btn.secondary{background:var(--accent-xl);color:var(--accent-d);box-shadow:var(--out-s)}.btn.secondary:active{box-shadow:var(--in-s)}
 .btn.ghost{background:var(--surface);color:var(--ink);box-shadow:var(--out-s)}.btn.ghost:active{box-shadow:var(--in-s)}
 .btn:disabled{opacity:.55;cursor:wait}
@@ -99,7 +99,7 @@ textarea{min-height:110px;resize:vertical}
 .tile.on{background:var(--accent-xl);box-shadow:var(--in-s),0 0 0 3px var(--accent)}.tile b{font-size:.93rem}.tile small{color:var(--mut)}
 .chips{display:flex;gap:10px;flex-wrap:wrap}.chips button{border:0;cursor:pointer;color:var(--accent-d)}
 .kw{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:16px 4px}.kw+.kw{border-top:2px solid rgba(var(--warm),.24)}
-.code{background:#1f1424;color:#ffe9f2;border-radius:22px;padding:18px;font-family:ui-monospace,monospace;font-size:.82rem;overflow-x:auto;white-space:pre;box-shadow:inset 5px 5px 12px rgba(0,0,0,.5),inset -3px -3px 8px rgba(255,160,200,.12)}
+.code{background:#1f1424;color:#ffe9f2;border-radius:22px;padding:18px;font-family:ui-monospace,monospace;font-size:.82rem;overflow-x:auto;white-space:pre;box-shadow:none}
 .spin{display:inline-block;width:13px;height:13px;border:3px solid var(--accent-l);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-1px;margin-right:7px}@keyframes sp{to{transform:rotate(360deg)}}
 body.in-app>div>header{display:none}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}.btn,.post{transition:none}}
