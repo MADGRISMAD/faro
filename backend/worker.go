@@ -13,10 +13,10 @@ import (
 )
 
 type WorkItem struct {
-	ID, Tenant, Site string
-	Attempt          int
-	Prompt           Prompt
-	Reserve          int64
+	ID, Tenant, Site, Kind string
+	Attempt                int
+	Prompt                 Prompt
+	Reserve                int64
 }
 
 func (a *App) claim(ctx context.Context) (*WorkItem, error) {
@@ -27,7 +27,7 @@ func (a *App) claim(ctx context.Context) (*WorkItem, error) {
 	defer tx.Rollback()
 	var j WorkItem
 	var keyword sql.NullString
-	e = tx.QueryRowContext(ctx, `SELECT j.id,j.tenant_id,j.site_id,j.attempts,j.topic,j.business,j.audience,j.keyword,s.brand_description,s.tone FROM jobs j JOIN sites s ON s.id=j.site_id WHERE j.status='queued' AND NOT EXISTS(SELECT 1 FROM jobs r WHERE r.tenant_id=j.tenant_id AND r.status='running') ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&j.ID, &j.Tenant, &j.Site, &j.Attempt, &j.Prompt.Topic, &j.Prompt.Business, &j.Prompt.Audience, &keyword, &j.Prompt.Brand, &j.Prompt.Tone)
+	e = tx.QueryRowContext(ctx, `SELECT j.id,j.tenant_id,j.site_id,j.attempts,j.topic,j.business,j.audience,j.keyword,s.brand_description,s.tone,j.kind FROM jobs j JOIN sites s ON s.id=j.site_id WHERE j.status='queued' AND NOT EXISTS(SELECT 1 FROM jobs r WHERE r.tenant_id=j.tenant_id AND r.status='running') ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&j.ID, &j.Tenant, &j.Site, &j.Attempt, &j.Prompt.Topic, &j.Prompt.Business, &j.Prompt.Audience, &keyword, &j.Prompt.Brand, &j.Prompt.Tone, &j.Kind)
 	if errors.Is(e, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -180,7 +180,7 @@ func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 	body, _ := json.Marshal(g.Content)
 	articleSlug := slug(g.Title) + "-" + j.ID[:8]
 	var article string
-	e = tx.QueryRowContext(ctx, `INSERT INTO articles(tenant_id,site_id,job_id,title,slug,meta_description,summary,content) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`, j.Tenant, j.Site, j.ID, clean(g.Title, 180), articleSlug, clean(g.MetaDescription, 320), clean(g.Summary, 1000), body).Scan(&article)
+	e = tx.QueryRowContext(ctx, `INSERT INTO articles(tenant_id,site_id,job_id,title,slug,meta_description,summary,content,status,published_at) SELECT $1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN s.autopilot THEN 'published' ELSE 'draft' END,CASE WHEN s.autopilot THEN now() END FROM sites s WHERE s.id=$2 RETURNING id`, j.Tenant, j.Site, j.ID, clean(g.Title, 180), articleSlug, clean(g.MetaDescription, 320), clean(g.Summary, 1000), body).Scan(&article)
 	if e != nil {
 		return e
 	}
@@ -191,7 +191,7 @@ func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 	return tx.Commit()
 }
 func (a *App) Work(ctx context.Context) {
-	lastRecovery := time.Time{}
+	lastRecovery, lastAutopilot := time.Time{}, time.Time{}
 	for {
 		if ctx.Err() != nil {
 			return
@@ -202,6 +202,12 @@ func (a *App) Work(ctx context.Context) {
 			}
 			lastRecovery = time.Now()
 		}
+		if time.Since(lastAutopilot) > 5*time.Minute {
+			if e := a.autopilotTick(ctx); e != nil {
+				slog.Error("Autopiloto", "error", e)
+			}
+			lastAutopilot = time.Now()
+		}
 		j, e := a.claim(ctx)
 		if e != nil {
 			slog.Error("Cola", "error", e)
@@ -210,6 +216,10 @@ func (a *App) Work(ctx context.Context) {
 		}
 		if j == nil {
 			time.Sleep(700 * time.Millisecond)
+			continue
+		}
+		if j.Kind == "research" {
+			a.runResearch(ctx, j)
 			continue
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
