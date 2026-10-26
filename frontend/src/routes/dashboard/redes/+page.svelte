@@ -4,7 +4,7 @@
 	import { siteId, sites } from '#lib/app';
 
 	type Post = { title: string; status: string; url: string; error: string; at: string };
-	type Data = { configured: boolean; status: 'none' | 'choosing' | 'connected' | 'broken'; page_name?: string; error?: string; choices: { id: string; name: string }[]; posts: Post[] };
+	type Data = { configured: boolean; status: 'none' | 'choosing' | 'connected' | 'broken'; page_name?: string; error?: string; choices: { id: string; name: string }[]; posts: Post[]; unshared: { id: string; title: string; published_at: string }[] };
 	let data: Data | null = null, error = '', notice = '', busy = false, pick = '', loadedFor = '';
 	const notes: Record<string, string> = {
 		ok: 'Facebook conectado. Desde ahora, cada artículo que se publique se compartirá en tu página.',
@@ -57,6 +57,11 @@
 		notice = notes.ok;
 		await load();
 	});
+	const share = (ids: string[]) => run(async () => {
+		const r = await api(`/sites/${$siteId}/facebook/share`, { method: 'POST', body: JSON.stringify({ article_ids: ids }) });
+		notice = r.queued > 1 ? `Listo: ${r.queued} artículos en cola. El primero sale en un minuto y los demás uno cada 2 horas, para no llenar tu página de golpe.` : 'Listo: sale en tu página en un minuto.';
+		await load();
+	});
 	const disconnect = () => run(async () => {
 		if (!confirm('Faro dejará de compartir tus artículos en Facebook. Lo que ya se publicó en tu página no se borra. ¿Desconectar?')) return;
 		await api(`/sites/${$siteId}/facebook`, { method: 'DELETE' });
@@ -96,7 +101,7 @@
 			</fieldset>
 			<div class="acts"><button class="btn" disabled={!pick || busy} on:click={choose}>Usar esta página</button><button class="btn ghost" disabled={busy} on:click={connect}>Volver a autorizar</button></div>
 		{:else if data?.status === 'connected'}
-			<p class="muted">Se comparten los artículos que se publiquen desde ahora; los anteriores no. Si un artículo queda en borrador, se comparte hasta que lo publiques.</p>
+			<p class="muted">Se comparten solos los artículos que se publiquen desde ahora; los anteriores los puedes compartir abajo. Si un artículo queda en borrador, se comparte hasta que lo publiques.</p>
 			<div class="acts"><button class="btn ghost" disabled={busy} on:click={connect}>Cambiar de página</button><button class="btn danger" disabled={busy} on:click={disconnect}>Desconectar</button></div>
 		{:else if data?.status === 'broken'}
 			<p class="error">{data.error || 'Facebook ya no deja publicar en tu página.'} Suele pasar si cambiaste tu contraseña de Facebook o quitaste el permiso.</p>
@@ -111,13 +116,26 @@
 		{/if}
 	</section>
 
+	{#if data?.status === 'connected' && data.unshared.length}
+		<section class="panel">
+			<div class="row-head"><div><h2 class="h-posts">Artículos que aún no están en Facebook</h2><small class="muted">Los que publicaste antes de conectar, o los que no se pudieron compartir.</small></div>
+				{#if data.unshared.length > 1}<button class="btn small" disabled={busy} on:click={() => share(data?.unshared.map((a) => a.id) || [])}>Compartir todos ({data.unshared.length})</button>{/if}</div>
+			<ul class="posts">
+				{#each data.unshared as a}
+					<li><div class="grow"><b>{a.title}</b><small>Publicado el {when(a.published_at)}</small></div><button class="btn ghost small" disabled={busy} on:click={() => share([a.id])}>Compartir</button></li>
+				{/each}
+			</ul>
+			{#if data.unshared.length > 1}<p class="muted small">«Compartir todos» los publica uno cada 2 horas.</p>{/if}
+		</section>
+	{/if}
+
 	{#if data?.posts.length}
 		<section class="panel">
 			<h2 class="h-posts">Lo que se ha compartido</h2>
 			<ul class="posts">
 				{#each data.posts as p}
 					<li>
-						<div class="grow"><b>{p.title}</b><small>{when(p.at)}{#if p.error} · {p.error}{/if}</small></div>
+						<div class="grow"><b>{p.title}</b><small>{p.status === 'pending' && new Date(p.at) > new Date() ? 'Programado para el ' + when(p.at) : when(p.at)}{#if p.error} · {p.error}{/if}</small></div>
 						<span class="chip st-{p.status}">{statusName[p.status] || p.status}</span>
 						{#if p.url}<a class="btn ghost small" href={p.url} target="_blank" rel="noopener noreferrer">Ver en Facebook</a>{/if}
 					</li>
@@ -160,6 +178,7 @@
 	.page { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 18px; box-shadow: var(--out-s); font-weight: 700; cursor: pointer; }
 	.page input { width: auto; box-shadow: none; accent-color: var(--accent); }
 	.page.on { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-xl); }
+	.row-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
 	.posts { list-style: none; margin: 14px 0 0; padding: 0; }
 	.posts li { display: flex; align-items: center; gap: 14px; padding: 14px 0; flex-wrap: wrap; }
 	.posts li + li { border-top: 1px solid var(--line); }

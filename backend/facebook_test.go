@@ -52,6 +52,17 @@ func TestFacebookConectaYPublica(t *testing.T) {
 	cookie, csrf, tenant, siteID, _ := siteWithTopics(t, app, srv)
 	app.DB.Exec(`UPDATE sites SET connected_at=now(),canonical_url='https://ejemplo.test',blog_prefix='/blog' WHERE id=$1`, siteID)
 
+	publish := func(slug string) {
+		var id string
+		if e := app.DB.QueryRow(`INSERT INTO articles(tenant_id,site_id,title,slug,meta_description,summary,content,status) VALUES($1,$2,$3,$4,'m','Resumen','{"intro":"x","sections":[],"faq":[]}','draft') RETURNING id`, tenant, siteID, "Artículo "+slug, slug).Scan(&id); e != nil {
+			t.Fatal(e)
+		}
+		app.DB.Exec(`UPDATE articles SET status='approved' WHERE id=$1`, id) // aprobar no comparte
+		app.DB.Exec(`UPDATE articles SET status='published',published_at=now() WHERE id=$1`, id)
+	}
+	old := "fb-viejo-" + token()[:6]
+	publish(old) // antes de conectar: no se comparte solo
+
 	_, res, _ := request(t, srv, "POST", "/sites/"+siteID+"/facebook/start", map[string]any{}, cookie, csrf, "")
 	u, _ := url.Parse(res["url"].(string))
 	state := u.Query().Get("state")
@@ -77,20 +88,25 @@ func TestFacebookConectaYPublica(t *testing.T) {
 		t.Fatalf("elegir página: %d", code)
 	}
 
-	publish := func(slug string) {
-		var id string
-		if e := app.DB.QueryRow(`INSERT INTO articles(tenant_id,site_id,title,slug,meta_description,summary,content,status) VALUES($1,$2,$3,$4,'m','Resumen','{"intro":"x","sections":[],"faq":[]}','draft') RETURNING id`, tenant, siteID, "Artículo "+slug, slug).Scan(&id); e != nil {
-			t.Fatal(e)
-		}
-		app.DB.Exec(`UPDATE articles SET status='approved' WHERE id=$1`, id) // aprobar no comparte
-		app.DB.Exec(`UPDATE articles SET status='published',published_at=now() WHERE id=$1`, id)
-	}
 	publish("fb-uno-" + token()[:6])
 	ctx := context.Background()
 	app.socialTick(ctx)
 	app.socialTick(ctx) // nada se manda dos veces
 	if posts.Load() != 1 {
 		t.Fatalf("publicaciones en Facebook: %d", posts.Load())
+	}
+	// los anteriores se comparten con el botón; uno solo sale de inmediato
+	_, st, _ = request(t, srv, "GET", "/sites/"+siteID+"/facebook", nil, cookie, "", "")
+	un := st["unshared"].([]any)
+	if len(un) != 1 || un[0].(map[string]any)["title"] != "Artículo "+old {
+		t.Fatalf("pendientes de compartir: %v", un)
+	}
+	if code, r, _ := request(t, srv, "POST", "/sites/"+siteID+"/facebook/share", map[string]any{"article_ids": []string{un[0].(map[string]any)["id"].(string)}}, cookie, csrf, ""); code != 200 || r["queued"] != float64(1) {
+		t.Fatalf("compartir viejo: %d %v", code, r)
+	}
+	app.socialTick(ctx)
+	if posts.Load() != 2 {
+		t.Fatalf("el artículo viejo no salió: %d", posts.Load())
 	}
 	_, st, _ = request(t, srv, "GET", "/sites/"+siteID+"/facebook", nil, cookie, "", "")
 	first := st["posts"].([]any)[0].(map[string]any)
@@ -111,7 +127,7 @@ func TestFacebookConectaYPublica(t *testing.T) {
 	publish("fb-tres-" + token()[:6])
 	var n int
 	app.DB.QueryRow(`SELECT count(*) FROM social_posts WHERE site_id=$1`, siteID).Scan(&n)
-	if n != 2 {
+	if n != 3 {
 		t.Fatalf("tras desconectar no debía encolar: %d", n)
 	}
 }

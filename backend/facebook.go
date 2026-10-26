@@ -306,7 +306,74 @@ func (a *App) facebookStatus(w http.ResponseWriter, r *http.Request) {
 		posts = append(posts, map[string]any{"title": title, "status": st, "url": link, "error": msg, "at": at})
 	}
 	out["posts"] = posts
+	// publicados que aún no salieron en Facebook (los de antes de conectar, o los que fallaron o se cancelaron)
+	older := []map[string]any{}
+	rows2, e := a.DB.QueryContext(r.Context(), `SELECT a.id,a.title,a.published_at FROM articles a LEFT JOIN social_posts p ON p.article_id=a.id
+		WHERE a.site_id=$1 AND a.tenant_id=$2 AND a.status='published' AND (p.article_id IS NULL OR p.status IN ('failed','cancelled','unknown')) ORDER BY a.published_at DESC LIMIT 50`, site, t)
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	defer rows2.Close()
+	for rows2.Next() {
+		var id, title string
+		var at sql.NullTime
+		if e = rows2.Scan(&id, &title, &at); e != nil {
+			dbError(w, e)
+			return
+		}
+		older = append(older, map[string]any{"id": id, "title": title, "published_at": at.Time})
+	}
+	out["unshared"] = older
 	jsonResponse(w, 200, out)
+}
+
+// facebookShare comparte artículos ya publicados. Varios a la vez salen espaciados (uno cada 2 horas) para no
+// llenar la página de golpe; el primero sale en el siguiente turno del worker.
+func (a *App) facebookShare(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := a.auth(w, r, true)
+	if !ok {
+		return
+	}
+	site, ok := requireUUID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	var x struct {
+		IDs []string `json:"article_ids"`
+	}
+	if !decode(w, r, &x) {
+		return
+	}
+	if len(x.IDs) == 0 || len(x.IDs) > 50 {
+		fail(w, 400, "Elige entre 1 y 50 artículos")
+		return
+	}
+	var status string
+	if a.DB.QueryRowContext(r.Context(), `SELECT status FROM site_facebook WHERE site_id=$1 AND tenant_id=$2`, site, t).Scan(&status); status != "connected" {
+		fail(w, 409, "Primero conecta una página de Facebook")
+		return
+	}
+	queued := 0
+	for _, id := range x.IDs {
+		id, ok := parseUUID(id)
+		if !ok {
+			continue
+		}
+		res, e := a.DB.ExecContext(r.Context(), `INSERT INTO social_posts(article_id,site_id,tenant_id,page_id,updated_at)
+			SELECT a.id,a.site_id,a.tenant_id,f.page_id,now()+make_interval(hours => 2*$4) FROM articles a JOIN site_facebook f ON f.site_id=a.site_id AND f.status='connected'
+			WHERE a.id=$1 AND a.site_id=$2 AND a.tenant_id=$3 AND a.status='published'
+			ON CONFLICT(article_id) DO UPDATE SET status='pending',attempts=0,last_error=NULL,post_id=NULL,page_id=EXCLUDED.page_id,updated_at=EXCLUDED.updated_at
+			WHERE social_posts.status IN ('failed','cancelled','unknown')`, id, site, t, queued)
+		if e != nil {
+			dbError(w, e)
+			return
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			queued++
+		}
+	}
+	jsonResponse(w, 200, map[string]any{"queued": queued})
 }
 
 func (a *App) facebookChoose(w http.ResponseWriter, r *http.Request) {

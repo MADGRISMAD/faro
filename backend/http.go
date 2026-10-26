@@ -40,6 +40,7 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("GET /facebook/callback", a.facebookCallback)
 	m.HandleFunc("GET /sites/{id}/facebook", a.facebookStatus)
 	m.HandleFunc("POST /sites/{id}/facebook/page", a.facebookChoose)
+	m.HandleFunc("POST /sites/{id}/facebook/share", a.facebookShare)
 	m.HandleFunc("DELETE /sites/{id}/facebook", a.facebookDisconnect)
 	m.HandleFunc("GET /sites/{id}/analytics", a.siteAnalytics)
 	m.HandleFunc("DELETE /sites/{id}/google", a.googleDisconnect)
