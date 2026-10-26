@@ -42,7 +42,9 @@
 <div class="view">
 	<div class="row"><div><h1>Brand DNA</h1><p class="sub">La IA aprende tu marca leyendo tu sitio. Puedes ajustarla cuando quieras.</p></div>{#if saved}<span class="chip published">{saved}</span>{/if}</div>
 	{#if error}<p class="error" role="alert">{error}</p>{/if}
-	{#if !p}
+	{#if !p && $research?.status === 'none'}
+		<div class="panel">Este sitio se dio de alta a mano, así que la IA no lo ha leído todavía. Añade el sitio otra vez pegando su dirección y la IA llenará aquí todo por ti.</div>
+	{:else if !p}
 		<div class="panel"><span class="spin"></span>Todavía estoy analizando tu sitio…</div>
 	{:else}
 		<div class="panel">

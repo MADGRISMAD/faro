@@ -48,7 +48,7 @@
 	<p class="sub">Tu blog ya está publicado. Aquí eliges cómo llega a {domain}.</p>
 
 	{#if r?.connected}
-		<div class="panel" style="margin-bottom:18px;border-color:#1b603b"><b>Conectado.</b> <span class="muted">Tus artículos salen en <a href={r.blog_base}>{r.blog_base}</a>.</span></div>
+		<div class="panel" style="margin-bottom:18px;box-shadow:var(--out),0 0 0 3px #7fae72"><b>Conectado.</b> <span class="muted">Tus artículos salen en <a href={r.blog_base}>{r.blog_base}</a>.</span></div>
 	{/if}
 
 	<section class="panel" style="margin-bottom:18px">
@@ -65,7 +65,7 @@
 		<h2 style="font-size:1.25rem;margin:0 0 4px">2 · En tu propio dominio <span class="chip">Mejor para SEO</span></h2>
 		<p class="muted" style="margin-top:0">Así tus artículos viven en <b>{r?.canonical_url}{r?.blog_prefix}</b> y el prestigio de Google se queda en tu sitio. Tu servidor debe enviar esa ruta a FaroContenido.</p>
 		{#if names[platform]}
-			<p class="panel" style="background:#faf8f2;margin:0 0 14px">Detectamos que tu sitio usa <b>{names[platform]}</b>.
+			<p class="panel" style="background:var(--bg);box-shadow:var(--in-s);margin:0 0 14px">Detectamos que tu sitio usa <b>{names[platform]}</b>.
 				{#if closed.includes(platform)}
 					En {names[platform]} no se puede enviar una ruta a otro servidor. Usa la opción 1 (enlace en tu menú) o la 3 (widget), o pon Cloudflare delante de tu dominio y usa su receta de abajo.
 				{:else}
