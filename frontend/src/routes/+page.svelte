@@ -103,7 +103,7 @@
 					</div>
 				</div>
 				<div class="pedestal">{@render faro()}</div>
-				<img class="hero-mascot" src="/mascota/animada.gif" width="400" height="400" alt="Mascota de FaroContenido saludando" />
+				<img class="hero-mascot" src="/mascota/animada.gif" width="260" height="260" alt="Mascota de FaroContenido saludando" />
 			</div>
 		</section>
 
