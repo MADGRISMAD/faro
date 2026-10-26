@@ -55,8 +55,9 @@
 	const n = (v: number) => Math.round(v).toLocaleString('es-MX');
 	const pct = (v: number) => (v * 100).toFixed(1) + ' %';
 	// Cambio contra el periodo anterior; en posición, bajar es mejorar.
-	function delta(cur: number, prev: number, lowerIsBetter = false) {
-		if (!prev) return cur ? { text: 'nuevo', good: true } : { text: '—', good: true };
+	function delta(cur: number, prev: number, lowerIsBetter = false, count = true) {
+		// «nuevo» solo tiene sentido para conteos; en CTR y posición, sin periodo anterior no hay con qué comparar.
+		if (!prev) return cur ? { text: count ? 'nuevo' : 'sin periodo anterior', good: true } : { text: '—', good: true };
 		const d = ((cur - prev) / prev) * 100;
 		return { text: (d >= 0 ? '+' : '') + d.toFixed(0) + ' %', good: lowerIsBetter ? d <= 0 : d >= 0 };
 	}
@@ -66,13 +67,19 @@
 		return values.map((v, i) => `${(i / (values.length - 1)) * 100},${30 - (v / max) * 28}`).join(' ');
 	}
 	let t: Totals | undefined, p: Totals | undefined;
+	// En una propiedad de dominio, Google junta varios hosts (con y sin www): si hay más de uno, se muestra el host para no repetir «/».
+	$: multiHost = new Set((data?.pages || []).map((x) => x.page.replace(/^https?:\/\//, '').split('/')[0])).size > 1;
+	const pageLabel = (u: string, withHost: boolean) => {
+		const m = u.match(/^https?:\/\/([^/]+)(\/.*)?$/);
+		return m ? (withHost ? m[1] : '') + (m[2] || '/') : u;
+	};
 	$: t = data?.totals;
 	$: p = data?.previous;
 	$: cards = t && p ? [
 		['Impresiones', n(t.impressions), delta(t.impressions, p.impressions), 'Veces que Google te mostró', (data?.series || []).map((x) => x.impressions)],
 		['Clics', n(t.clicks), delta(t.clicks, p.clicks), 'Visitas que llegaron desde Google', (data?.series || []).map((x) => x.clicks)],
-		['CTR', pct(t.ctr), delta(t.ctr, p.ctr), 'Qué tan seguido hacen clic', []],
-		['Posición media', t.position ? '#' + t.position.toFixed(1) : '—', delta(t.position, p.position, true), 'Tu lugar promedio en Google', []]
+		['CTR', pct(t.ctr), delta(t.ctr, p.ctr, false, false), 'Qué tan seguido hacen clic', []],
+		['Posición media', t.position ? '#' + t.position.toFixed(1) : '—', delta(t.position, p.position, true, false), 'Tu lugar promedio en Google', []]
 	] as [string, string, { text: string; good: boolean }, string, number[]][] : [];
 </script>
 
@@ -127,7 +134,7 @@
 		<div class="panel" style="margin-bottom:18px">
 			<h2 style="font-size:1.2rem;margin:0 0 10px">Páginas más vistas en Google</h2>
 			<div style="overflow-x:auto"><table class="data"><thead><tr><th>Página</th><th class="r">Clics</th><th class="r">Impresiones</th><th class="r">CTR</th><th class="r">Posición</th></tr></thead><tbody>
-				{#each data.pages || [] as q}<tr><td>{q.page.replace(/^https?:\/\/[^/]+/, '') || '/'}</td><td class="r">{n(q.clicks)}</td><td class="r">{n(q.impressions)}</td><td class="r">{pct(q.ctr)}</td><td class="r">#{q.position.toFixed(1)}</td></tr>{:else}<tr><td colspan="5" class="muted">Sin datos todavía.</td></tr>{/each}
+				{#each data.pages || [] as q}<tr><td>{pageLabel(q.page, multiHost)}</td><td class="r">{n(q.clicks)}</td><td class="r">{n(q.impressions)}</td><td class="r">{pct(q.ctr)}</td><td class="r">#{q.position.toFixed(1)}</td></tr>{:else}<tr><td colspan="5" class="muted">Sin datos todavía.</td></tr>{/each}
 			</tbody></table></div>
 		</div>
 		<p class="muted small">Propiedad: {data.property} · <button class="btn ghost small" on:click={disconnect} disabled={busy}>Desconectar Google</button></p>
