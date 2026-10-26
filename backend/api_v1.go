@@ -68,7 +68,7 @@ func (a *App) v1Posts(w http.ResponseWriter, r *http.Request) {
 	}
 	var total int
 	_ = a.DB.QueryRowContext(r.Context(), `SELECT count(*) FROM articles WHERE site_id=$1 AND status='published'`, s.ID).Scan(&total)
-	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,slug,title,summary,meta_description,published_at,has_image FROM articles WHERE site_id=$1 AND status='published' ORDER BY published_at DESC,id LIMIT $2 OFFSET $3`, s.ID, limit, (page-1)*limit)
+	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,slug,title,summary,meta_description,published_at,has_image,content FROM articles WHERE site_id=$1 AND status='published' ORDER BY published_at DESC,id LIMIT $2 OFFSET $3`, s.ID, limit, (page-1)*limit)
 	if e != nil {
 		dbError(w, e)
 		return
@@ -79,11 +79,14 @@ func (a *App) v1Posts(w http.ResponseWriter, r *http.Request) {
 		var id, slug, title, summary, meta string
 		var at time.Time
 		var img bool
-		if e = rows.Scan(&id, &slug, &title, &summary, &meta, &at, &img); e != nil {
+		var data []byte
+		if e = rows.Scan(&id, &slug, &title, &summary, &meta, &at, &img, &data); e != nil {
 			dbError(w, e)
 			return
 		}
-		posts = append(posts, map[string]any{"id": id, "slug": slug, "title": title, "summary": summary, "meta_description": meta, "published_at": at, "path": s.Prefix + "/" + slug, "image": v1Image(s, slug, title, img)})
+		var c Content
+		_ = json.Unmarshal(data, &c)
+		posts = append(posts, map[string]any{"id": id, "slug": slug, "title": title, "summary": summary, "meta_description": meta, "published_at": at, "reading_minutes": readingMinutes(c), "path": s.Prefix + "/" + slug, "image": v1Image(s, slug, title, img)})
 	}
 	v1Headers(w)
 	jsonResponse(w, 200, map[string]any{"site": map[string]any{"id": s.ID, "name": s.Name, "domain": s.Domain, "canonical_url": s.Canonical, "blog_prefix": s.Prefix, "language": "es-MX"}, "page": page, "limit": limit, "total": total, "posts": posts})
@@ -164,7 +167,7 @@ func (a *App) v1Post(w http.ResponseWriter, r *http.Request) {
 	}
 	v1Headers(w)
 	jsonResponse(w, 200, map[string]any{
-		"id": id, "site_id": s.ID, "slug": slug, "title": title, "summary": summary, "published_at": at,
+		"id": id, "site_id": s.ID, "slug": slug, "title": title, "summary": summary, "published_at": at, "reading_minutes": readingMinutes(c),
 		"path": s.Prefix + "/" + slug, "canonical": strings.TrimRight(s.Canonical, "/") + s.Prefix + "/" + slug,
 		"image":   v1Image(s, slug, title, img),
 		"seo":     map[string]any{"title": title + " | " + s.Name, "description": meta},
@@ -185,3 +188,6 @@ func (a *App) v1Image(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	serveImage(w, r, a.DB, `SELECT i.mime,i.data,i.alt FROM article_images i JOIN articles a ON a.id=i.article_id WHERE a.site_id=$1 AND a.slug=$2 AND a.status='published'`, false, s.ID, r.PathValue("slug"))
 }
+
+// readingMinutes: ~200 palabras por minuto, mínimo 1.
+func readingMinutes(c Content) int { return max(1, (wordCount(c)+199)/200) }

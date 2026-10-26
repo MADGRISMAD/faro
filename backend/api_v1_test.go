@@ -54,6 +54,9 @@ func TestAPIv1EntregaSoloDatos(t *testing.T) {
 	_, list, _ := request(t, srv, "GET", "/v1/"+domain+"/posts", nil, "", "", "")
 	first := list["posts"].([]any)[0].(map[string]any)
 	img := first["image"].(map[string]any)
+	if rm, _ := first["reading_minutes"].(float64); rm < 1 {
+		t.Fatalf("minutos de lectura: %#v", first)
+	}
 	if first["path"] != "/blog/"+slug || !strings.HasSuffix(img["url"].(string), "/api/v1/"+domain+"/posts/"+slug+"/image") || img["alt"] == "" {
 		t.Fatalf("post: %#v", first)
 	}
@@ -61,6 +64,9 @@ func TestAPIv1EntregaSoloDatos(t *testing.T) {
 	ld := post["jsonld"].([]any)
 	if code != 200 || len(ld) != 2 || ld[0].(map[string]any)["@type"] != "BlogPosting" || ld[1].(map[string]any)["@type"] != "FAQPage" {
 		t.Fatalf("artículo: %d %#v", code, post["jsonld"])
+	}
+	if rm, _ := post["reading_minutes"].(float64); rm < 1 {
+		t.Fatalf("minutos de lectura del artículo: %#v", post["reading_minutes"])
 	}
 	if !strings.HasSuffix(post["canonical"].(string), "/blog/"+slug) || post["seo"].(map[string]any)["description"] == "" || !strings.Contains(post["html"].(string), "<h2>") {
 		t.Fatalf("seo/html: %#v", post)

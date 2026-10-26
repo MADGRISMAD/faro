@@ -6,7 +6,7 @@ Faro entrega los **datos** de tus artículos y tu sitio pone el diseño. Es cont
 
 | Ruta | Qué devuelve |
 | --- | --- |
-| `GET /api/v1/{sitio}/posts?limit=20&page=1` | `site` (id, nombre, dominio, canonical, prefijo), `total` y `posts[]` con `slug`, `title`, `summary`, `meta_description`, `published_at`, `path` e `image` |
+| `GET /api/v1/{sitio}/posts?limit=20&page=1` | `site` (id, nombre, dominio, canonical, prefijo), `total` y `posts[]` con `slug`, `title`, `summary`, `meta_description`, `published_at`, `reading_minutes`, `path` e `image` |
 | `GET /api/v1/{sitio}/posts/{slug}` | lo anterior más `canonical`, `seo` (title, description), `content` (estructura: intro, secciones, FAQ), `html` listo para insertar y `jsonld` (BlogPosting y FAQPage) |
 | `GET /api/v1/{sitio}/posts/{slug}/image` | portada en JPEG (1376×768) |
 
