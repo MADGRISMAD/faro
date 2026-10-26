@@ -22,6 +22,53 @@
 		apache: `# Necesita mod_proxy, mod_proxy_http, mod_ssl y mod_headers\nSSLProxyEngine on\nProxyPreserveHost Off\nRequestHeader set x-faro-domain "${domain}"\nProxyPass ${path} https://${faro}${path}\nProxyPassReverse ${path} https://${faro}${path}`
 	} as Record<string, string>;
 	$: if (!recipe) recipe = platform === 'vercel' ? 'nextjs' : ['nginx', 'caddy', 'cloudflare', 'apache', 'netlify'].includes(platform) ? platform : 'nginx';
+	// El ejemplo se arma con líneas sueltas para no mezclar las comillas invertidas del código de ejemplo con las de este archivo.
+	const bt = '`', dl = '$';
+	$: nextLib = [
+		'// lib/faro.js: Faro solo entrega los datos; tú los pintas con tu diseño.',
+		"const FARO = 'https://" + faro + "';",
+		"const SITE = '" + domain + "';",
+		'',
+		'export async function getPosts() {',
+		'  const r = await fetch(' + bt + dl + '{FARO}/api/v1/' + dl + '{SITE}/posts' + bt + ', { next: { revalidate: 300 } });',
+		'  return r.ok ? r.json() : { site: null, posts: [] };',
+		'}',
+		'',
+		'export async function getPost(slug) {',
+		'  const r = await fetch(' + bt + dl + '{FARO}/api/v1/' + dl + '{SITE}/posts/' + dl + '{slug}' + bt + ', { next: { revalidate: 300 } });',
+		'  return r.ok ? r.json() : null;',
+		'}'
+	].join('\n');
+	$: nextPage = [
+		'// app' + path + '/[slug]/page.js',
+		"import { notFound } from 'next/navigation';",
+		"import { getPost } from '@/lib/faro';",
+		'',
+		'export async function generateMetadata({ params }) {',
+		'  const post = await getPost((await params).slug);',
+		'  if (!post) return {};',
+		'  return {',
+		'    title: post.seo.title,',
+		'    description: post.seo.description,',
+		'    alternates: { canonical: post.canonical },',
+		'    openGraph: { images: post.image ? [post.image.url] : [] },',
+		"    other: { 'faro-site': post.site_id } // para que Faro marque tu sitio como conectado",
+		'  };',
+		'}',
+		'',
+		'export default async function Page({ params }) {',
+		'  const post = await getPost((await params).slug);',
+		'  if (!post) notFound();',
+		'  return (',
+		'    <article>',
+		'      {post.jsonld.map((d, i) => <script key={i} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(d) }} />)}',
+		'      <h1>{post.title}</h1>',
+		'      {post.image && <img src={post.image.url} alt={post.image.alt} />}',
+		'      <div dangerouslySetInnerHTML={{ __html: post.html }} />',
+		'    </article>',
+		'  );',
+		'}'
+	].join('\n');
 	$: widget = `<div id="faro-blog"></div>\n<script src="${typeof location === 'undefined' ? '' : location.origin}/api/embed/${$siteId}.js" defer><\/script>`;
 
 	async function copy(key: string, text: string) {
@@ -64,7 +111,24 @@
 	</section>
 
 	<section class="panel" style="margin-bottom:18px">
-		<h2 style="font-size:1.25rem;margin:0 0 4px">2 · En tu propio dominio <span class="chip">Mejor para SEO</span></h2>
+		<h2 style="font-size:1.25rem;margin:0 0 4px">2 · Con tu propio diseño <span class="chip">Recomendado</span></h2>
+		<p class="muted" style="margin-top:0">Faro solo entrega los datos (texto, imagen y SEO ya listos) y tu sitio los pinta como quiera. Es la mejor opción si ya tienes diseño: tus artículos viven en <b>{r?.canonical_url}{r?.blog_prefix}</b> con tu estilo.</p>
+		<div class="code">GET https://{faro}/api/v1/{domain}/posts
+GET https://{faro}/api/v1/{domain}/posts/{'{slug}'}</div>
+		<p class="muted small">Cada artículo trae <code>title</code>, <code>summary</code>, <code>image</code> (url, alt, tamaño), <code>content</code> estructurado, <code>html</code> listo para insertar, <code>seo</code>, <code>canonical</code> y <code>jsonld</code>. Es contenido público con CORS abierto.</p>
+		<h3 style="font-size:1rem;margin:16px 0 8px">Ejemplo para Next.js</h3>
+		<div class="code">{nextLib}</div>
+		<button class="btn secondary small" style="margin:10px 0 14px" on:click={() => copy('lib', nextLib)}>{copied === 'lib' ? 'Copiado' : 'Copiar lib/faro.js'}</button>
+		<div class="code">{nextPage}</div>
+		<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+			<button class="btn secondary small" on:click={() => copy('page', nextPage)}>{copied === 'page' ? 'Copiado' : 'Copiar página del artículo'}</button>
+			<button class="btn small" on:click={verify} disabled={busy}>{busy ? 'Comprobando…' : 'Verificar conexión'}</button>
+		</div>
+		{#if result}<p class={result.connected ? 'success' : 'error'} role="status" style="margin-top:12px">{result.connected ? 'Conectado: tu sitio ya sirve el blog.' : result.reason}</p>{/if}
+	</section>
+
+	<section class="panel" style="margin-bottom:18px">
+		<h2 style="font-size:1.25rem;margin:0 0 4px">3 · Faro sirve la página en tu dominio <span class="chip">Sin escribir código de página</span></h2>
 		<p class="muted" style="margin-top:0">Así tus artículos viven en <b>{r?.canonical_url}{r?.blog_prefix}</b> y el prestigio de Google se queda en tu sitio. Tu servidor debe enviar esa ruta a FaroContenido.</p>
 		{#if names[platform]}
 			<p class="panel" style="background:var(--bg);box-shadow:var(--in-s);margin:0 0 14px">Detectamos que tu sitio usa <b>{names[platform]}</b>.
@@ -92,7 +156,7 @@
 	</section>
 
 	<section class="panel">
-		<h2 style="font-size:1.25rem;margin:0 0 4px">3 · Lista de artículos dentro de una página tuya</h2>
+		<h2 style="font-size:1.25rem;margin:0 0 4px">4 · Lista de artículos dentro de una página tuya</h2>
 		<p class="muted" style="margin-top:0">Pega este código en una página de tu sitio (en WordPress, Wix, Shopify o Webflow, en un bloque «HTML personalizado»). Muestra tus artículos; al abrirlos se leen en {r?.connected ? 'tu dominio' : 'tu blog alojado, hasta que conectes tu dominio'}.</p>
 		<div class="code">{widget}</div>
 		<button class="btn secondary small" style="margin-top:10px" on:click={() => copy('widget', widget)}>{copied === 'widget' ? 'Copiado' : 'Copiar código'}</button>

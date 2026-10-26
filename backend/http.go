@@ -43,6 +43,9 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("GET /public/sites/{id}/articles/{slug}", a.publicArticle)
 	m.HandleFunc("GET /public/sites/{id}/articles/{slug}/image", a.publicArticleImage)
 	m.HandleFunc("GET /articles/{id}/image", a.articleImage)
+	m.HandleFunc("GET /v1/{site}/posts", a.v1Posts)
+	m.HandleFunc("GET /v1/{site}/posts/{slug}", a.v1Post)
+	m.HandleFunc("GET /v1/{site}/posts/{slug}/image", a.v1Image)
 	m.HandleFunc("GET /api/embed/{id}", a.embed)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
