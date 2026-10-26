@@ -110,8 +110,11 @@ func (a *App) recoverStale(ctx context.Context) error {
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
+// Sin esto «Cómo» quedaba «c-mo»: las letras con acento del español se pasan a su letra base antes de limpiar.
+var accents = strings.NewReplacer("á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u", "ü", "u", "ñ", "n", "à", "a", "è", "e", "ì", "i", "ò", "o", "ù", "u", "ç", "c")
+
 func slug(s string) string {
-	s = strings.ToLower(s)
+	s = accents.Replace(strings.ToLower(s))
 	s = nonAlnum.ReplaceAllString(s, "-")
 	s = strings.Trim(s, "-")
 	if s == "" {
