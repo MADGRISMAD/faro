@@ -615,8 +615,9 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 	var blob []byte
 	var auto, autoPublish, images, connected, confirmed bool
 	var perWeek int
+	var created time.Time
 	var avoid, imgStyle, imgNotes, canonical, prefix, domain string
-	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics,canonical_url,blog_prefix,domain,connected_at IS NOT NULL,brand_confirmed_at IS NOT NULL FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid, &canonical, &prefix, &domain, &connected, &confirmed)
+	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics,canonical_url,blog_prefix,domain,connected_at IS NOT NULL,brand_confirmed_at IS NOT NULL,created_at FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid, &canonical, &prefix, &domain, &connected, &confirmed, &created)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -637,6 +638,11 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String, "images_enabled": images, "image_style": imgStyle, "image_notes": imgNotes, "avoid_topics": avoid, "brand_confirmed": confirmed, "connected": connected, "blog_base": blogBase(connected, canonical, prefix, domain), "hosted_url": hostedBase(domain), "domain": domain, "canonical_url": canonical, "blog_prefix": prefix}
 	if blob != nil {
 		out["research"] = json.RawMessage(blob)
+	}
+	// ritmo real: las dos primeras semanas el autopiloto publica 1 por semana aunque el cliente haya elegido más
+	out["effective_per_week"] = effectivePerWeek(created, perWeek)
+	if end := created.Add(rampUp); end.After(time.Now()) {
+		out["ramp_until"] = end
 	}
 	// avance de los artículos que arrancó el autopiloto
 	var queued, done, imgs int
@@ -809,11 +815,18 @@ func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
 
 // ───────────── Calendario: lo hecho, lo que se está escribiendo y lo que viene ─────────────
 
+const rampUp = 14 * 24 * time.Hour // arranque prudente: Google ve crecer el blog poco a poco
+
 func effectivePerWeek(created time.Time, perWeek int) int {
-	if time.Since(created) < 14*24*time.Hour {
+	return perWeekAt(created, perWeek, time.Now())
+}
+
+// perWeekAt: el ritmo que aplica en una fecha dada (el calendario lo usa para fechas futuras, ya pasado el arranque).
+func perWeekAt(created time.Time, perWeek int, at time.Time) int {
+	if at.Before(created.Add(rampUp)) {
 		return 1
 	}
-	return min(perWeek, 3)
+	return max(1, min(perWeek, 3))
 }
 
 func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
@@ -880,8 +893,10 @@ func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(blob, &p)
 		var last time.Time
 		_ = a.DB.QueryRowContext(r.Context(), `SELECT COALESCE(max(created_at),now()) FROM jobs WHERE site_id=$1 AND kind='article'`, site).Scan(&last)
-		step := time.Duration(168/effectivePerWeek(created, perWeek)) * time.Hour
-		next := last.Add(step)
+		step := func(at time.Time) time.Duration {
+			return time.Duration(168/perWeekAt(created, perWeek, at)) * time.Hour
+		}
+		next := last.Add(step(last))
 		if next.Before(time.Now()) {
 			next = time.Now().Add(time.Hour)
 		}
@@ -895,7 +910,7 @@ func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			upcoming = append(upcoming, map[string]any{"title": tp.Title, "keyword": tp.Keyword, "intent": tp.Intent, "at": next})
-			next = next.Add(step)
+			next = next.Add(step(next))
 		}
 	}
 	jsonResponse(w, 200, map[string]any{"articles": articles, "generating": generating, "upcoming": upcoming})

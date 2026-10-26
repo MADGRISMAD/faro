@@ -3,7 +3,7 @@
 	import Wizard from '../../lib/Wizard.svelte';
 	import Auth from '../../lib/Auth.svelte';
 	import { api } from '#lib/api';
-	import { user, ready, sites, siteId, addingSite, research, boot, loadSites, selectSite, stopPolling } from '#lib/app';
+	import { user, ready, sites, siteId, addingSite, research, boot, loadSites, selectSite, stopPolling, refreshSite } from '#lib/app';
 
 	let initialMode: 'login' | 'register' = 'register';
 	let url = '', error = '', busy = false;
@@ -13,12 +13,18 @@
 		if (new URLSearchParams(location.search).get('modo') === 'entrar') initialMode = 'login'; // viene del botón «Iniciar sesión» de la portada
 		document.body.classList.add('in-app');
 		boot();
+		// al volver a la pestaña se ve al momento lo que el autopiloto hizo mientras tanto (artículos y portadas)
+		document.addEventListener('visibilitychange', onVisible);
 	});
 	onDestroy(() => {
 		stopPolling();
-		if (typeof document !== 'undefined') document.body.classList.remove('in-app');
+		if (typeof document !== 'undefined') {
+			document.body.classList.remove('in-app');
+			document.removeEventListener('visibilitychange', onVisible);
+		}
 	});
 
+	const onVisible = () => document.visibilityState === 'visible' && $user && refreshSite();
 	async function analyze() {
 		busy = true;
 		error = '';

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api';
-	import { sites, siteId, research, user, refreshSite, loadSites } from '#lib/app';
+	import { sites, siteId, research, user, refreshSite, loadSites, shortDate } from '#lib/app';
 
 	let confirmText = '', removing = false;
 	let error = '', notice = '', canonical = '', prefix = '/blog', loaded = '';
@@ -36,11 +36,15 @@
 			removing = false;
 		}
 	}
+	let saved = '';
 	async function perWeek(n: number) {
 		error = '';
+		saved = '';
 		try {
 			await api(`/sites/${$siteId}/autopilot`, { method: 'PATCH', body: JSON.stringify({ enabled: $research?.autopilot ?? true, posts_per_week: n }) });
 			await refreshSite();
+			const until = $research?.ramp_until;
+			saved = until && n > 1 ? `Guardado. Hasta el ${shortDate(until)} sale 1 por semana (arranque); desde ese día, ${n} por semana. Tu calendario ya lo muestra.` : `Guardado: ${n} por semana. Tu calendario ya lo muestra.`;
 		} catch (e) {
 			error = (e as Error).message;
 		}
@@ -74,6 +78,7 @@
 		<div style="display:flex;gap:10px">
 			{#each [1, 2, 3] as n}<button class="btn small" class:secondary={$research?.posts_per_week !== n} on:click={() => perWeek(n)}>{n} por semana</button>{/each}
 		</div>
+		{#if saved}<p class="success" role="status" style="margin:14px 0 0">{saved}</p>{/if}
 	</section>
 
 	<section class="panel" style="margin-bottom:18px">

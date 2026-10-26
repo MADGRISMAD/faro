@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '#lib/api';
-	import { research, calendar, articles, siteId, sites, refreshSite, intentName } from '#lib/app';
+	import { research, calendar, articles, siteId, sites, refreshSite, intentName, shortDate } from '#lib/app';
 
 	let error = '', seo: { configured: boolean; connected: boolean; property?: string; totals?: { clicks: number; impressions: number; position: number } } | null = null, seoBusy = false;
 
@@ -116,12 +116,12 @@
 			<div class="stat"><span class="num">{published.length}</span><div><b>Publicados</b><span class="muted small">En {domain}</span></div></div>
 			<div class="stat"><span class="num">{drafts.length}</span><div><b>Por revisar</b><span class="muted small">{drafts.length ? 'Esperan tu revisión' : 'Nada pendiente'}</span></div></div>
 			<div class="stat"><span class="num">{upcoming.length}</span><div><b>Programados</b><span class="muted small">Próximas semanas</span></div></div>
-			<div class="stat"><span class="num">{r.posts_per_week}</span><div><b>Por semana</b><span class="muted small">Ritmo actual</span></div></div>
+			<div class="stat"><span class="num">{r.effective_per_week ?? r.posts_per_week}</span><div><b>Por semana</b><span class="muted small">{r.ramp_until && r.posts_per_week > 1 ? `Sube a ${r.posts_per_week} el ${shortDate(r.ramp_until)}` : 'Ritmo actual'}</span></div></div>
 		</div>
 
 		<div class="cols">
 			<section class="panel queue">
-				<div class="row"><h2>Cola de publicación</h2><span class="muted small">{r.posts_per_week} por semana · {upcoming.length} programados</span></div>
+				<div class="row"><h2>Cola de publicación</h2><span class="muted small">{r.effective_per_week ?? r.posts_per_week} por semana · {upcoming.length} programados</span></div>
 				{#each upcoming.slice(0, 4) as u}
 					{@const d = parts(u.at)}
 					<div class="well qitem">
