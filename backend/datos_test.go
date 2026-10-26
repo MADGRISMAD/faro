@@ -132,7 +132,8 @@ func TestPalabrasClaveConDatosReales(t *testing.T) {
 }
 
 func TestGoogleSearchConsoleReal(t *testing.T) {
-	var apiCalls, revoked atomic.Int32
+	var apiCalls, revoked, totals atomic.Int32
+	var empty atomic.Bool
 	var domain string
 	g := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -174,9 +175,11 @@ func TestGoogleSearchConsoleReal(t *testing.T) {
 			json.NewDecoder(r.Body).Decode(&b)
 			dims, _ := b["dimensions"].([]any)
 			switch {
-			case len(dims) == 0 && b["startDate"].(string) > "2000": // totales: el periodo actual y el anterior
+			case empty.Load():
+				w.Write([]byte(`{}`))
+			case len(dims) == 0: // totales: primero el periodo actual y luego el anterior
 				c := 120.0
-				if b["endDate"].(string) < "2026-10-01" {
+				if totals.Add(1)%2 == 0 {
 					c = 60
 				}
 				w.Write([]byte(`{"rows":[{"clicks":` + jsonNum(c) + `,"impressions":4000,"ctr":0.03,"position":8.4}]}`))
@@ -274,6 +277,16 @@ func TestGoogleSearchConsoleReal(t *testing.T) {
 	if code, _, _ := request(t, srv, "GET", "/sites/"+siteID+"/analytics", nil, otherCookie, "", ""); code != 404 {
 		t.Fatalf("analytics ajeno: %d", code)
 	}
+	// sitio sin datos en Google: se dice con claridad y no se confunde con un error
+	empty.Store(true)
+	app.DB.Exec(`DELETE FROM analytics_cache WHERE site_id=$1`, siteID)
+	_, an, _ = request(t, srv, "GET", "/sites/"+siteID+"/analytics?range=7d", nil, cookie, "", "")
+	h, _ := an["history"].(map[string]any)
+	if an["connected"] != true || an["totals"].(map[string]any)["impressions"].(float64) != 0 || h == nil || h["days_with_data"].(float64) != 0 {
+		t.Fatalf("sin datos: %#v", an)
+	}
+	empty.Store(false)
+	app.DB.Exec(`DELETE FROM analytics_cache WHERE site_id=$1`, siteID)
 
 	// desconectar: se revoca en Google y se borra el token
 	if code, _, _ := request(t, srv, "DELETE", "/sites/"+siteID+"/google", nil, cookie, csrf, ""); code != 200 {

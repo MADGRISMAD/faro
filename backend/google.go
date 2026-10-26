@@ -320,15 +320,15 @@ func (a *App) siteAnalytics(w http.ResponseWriter, r *http.Request) {
 		fail(w, 502, e.Error())
 		return
 	}
-	// Los datos de Search Console llegan con 2-3 días de retraso: el periodo termina hace 3 días.
-	end := time.Now().UTC().AddDate(0, 0, -3)
+	// dataState "all" incluye los datos más frescos (aún no definitivos): un sitio nuevo no debe verse vacío mientras Google termina de procesarlos.
+	end := time.Now().UTC()
 	start := end.AddDate(0, 0, -(days - 1))
 	pend := start.AddDate(0, 0, -1)
 	pstart := pend.AddDate(0, 0, -(days - 1))
 	f := func(d time.Time) string { return d.Format("2006-01-02") }
 	endpoint := gAPI() + "/sites/" + strings.ReplaceAll(url.QueryEscape(property), "+", "%20") + "/searchAnalytics/query"
 	query := func(from, to string, dims []string, limit int) ([]gRow, error) {
-		body := map[string]any{"startDate": from, "endDate": to, "rowLimit": limit}
+		body := map[string]any{"startDate": from, "endDate": to, "rowLimit": limit, "dataState": "all"}
 		if len(dims) > 0 {
 			body["dimensions"] = dims
 		}
@@ -367,7 +367,18 @@ func (a *App) siteAnalytics(w http.ResponseWriter, r *http.Request) {
 			days2 = append(days2, map[string]any{"date": x.Keys[0], "clicks": x.Clicks, "impressions": x.Impressions})
 		}
 	}
-	body, _ := json.Marshal(map[string]any{"configured": true, "connected": true, "property": property, "range": rng, "start": f(start), "end": f(end), "totals": total(cur), "previous": total(prev), "series": days2, "queries": list(queries, "query"), "pages": list(pages, "page"), "fetched_at": time.Now()})
+	// Si no hay nada en el periodo, se mira todo el histórico (16 meses) para distinguir «Google aún no tiene datos» de «hay datos, pero no en este periodo».
+	var history map[string]any
+	if len(cur) == 0 || cur[0].Impressions == 0 {
+		all, e := query(f(time.Now().UTC().AddDate(0, 0, -480)), f(end), []string{"date"}, 25000)
+		if e == nil {
+			history = map[string]any{"days_with_data": len(all)}
+			if len(all) > 0 {
+				history["first"], history["last"] = all[0].Keys[0], all[len(all)-1].Keys[0]
+			}
+		}
+	}
+	body, _ := json.Marshal(map[string]any{"configured": true, "connected": true, "property": property, "range": rng, "history": history, "start": f(start), "end": f(end), "totals": total(cur), "previous": total(prev), "series": days2, "queries": list(queries, "query"), "pages": list(pages, "page"), "fetched_at": time.Now()})
 	a.DB.ExecContext(r.Context(), `INSERT INTO analytics_cache(site_id,range,body) VALUES($1,$2,$3) ON CONFLICT(site_id,range) DO UPDATE SET body=EXCLUDED.body,fetched_at=now()`, site, rng, body)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)

@@ -6,6 +6,7 @@
 	type Totals = { clicks: number; impressions: number; ctr: number; position: number };
 	type Data = {
 		configured: boolean; connected: boolean; property?: string; error?: string; range?: string; start?: string; end?: string;
+		history?: { days_with_data: number; first?: string; last?: string } | null;
 		totals?: Totals; previous?: Totals; series?: { date: string; clicks: number; impressions: number }[];
 		queries?: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
 		pages?: { page: string; clicks: number; impressions: number; ctr: number; position: number }[];
@@ -107,7 +108,16 @@
 				</div>
 			{/each}
 		</div>
-		{#if !(data.totals?.impressions)}<div class="panel" style="margin-bottom:18px"><span class="muted">Todavía no hay impresiones en este periodo. Es normal si el sitio es nuevo: Google tarda semanas en mostrar un blog recién publicado.</span></div>{/if}
+		{#if !(data.totals?.impressions)}
+			<div class="panel" style="margin-bottom:18px">
+				<b>La conexión funciona, pero Google no reporta impresiones en este periodo.</b>
+				{#if data.history && data.history.days_with_data > 0}
+					<p class="muted" style="margin:6px 0 0">Google sí tiene datos de este sitio: {data.history.days_with_data} días entre el {data.history.first} y el {data.history.last}. Prueba con otro periodo (90d).</p>
+				{:else}
+					<p class="muted" style="margin:6px 0 0">En los últimos 16 meses Google no tiene ni una impresión registrada para <b>{data.property}</b>. Es lo normal si la propiedad se verificó hace poco, si el sitio es nuevo o si todavía casi no sale en búsquedas: Search Console empieza a llenarse uno o dos días después de verificar y un sitio nuevo tarda semanas en aparecer. Faro consulta a Google en vivo cada hora, así que los números aparecerán solos.</p>
+				{/if}
+			</div>
+		{/if}
 		<div class="panel" style="margin-bottom:18px">
 			<h2 style="font-size:1.2rem;margin:0 0 10px">Palabras con las que te encuentran</h2>
 			<div style="overflow-x:auto"><table class="data"><thead><tr><th>Búsqueda</th><th class="r">Clics</th><th class="r">Impresiones</th><th class="r">CTR</th><th class="r">Posición</th></tr></thead><tbody>
