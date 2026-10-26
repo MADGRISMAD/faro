@@ -23,6 +23,8 @@ type Config struct {
 	Model, Key            string
 	InputRate, OutputRate int64
 	MaxOutput             int
+	ImageModel            string // "" = sin imágenes
+	ImageRate             int64  // USD por millón de tokens de salida de imagen, ×1000
 }
 type App struct {
 	DB       *sql.DB
@@ -75,7 +77,18 @@ func config() (Config, error) {
 	if e != nil || max < 100 || max > 8000 {
 		return Config{}, errors.New("GEMINI_MAX_OUTPUT_TOKENS inválido")
 	}
-	return Config{env("GEMINI_MODEL", "mock"), os.Getenv("GEMINI_API_KEY"), in, out, max}, nil
+	model := env("GEMINI_MODEL", "mock")
+	img := env("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-lite-image") // el más barato de Nano Banana
+	if model == "mock" {
+		img = "mock"
+	} else if img == "off" {
+		img = ""
+	}
+	imgRate, e := parseRate(env("GEMINI_IMAGE_USD_PER_MILLION", "30.0"))
+	if e != nil {
+		return Config{}, e
+	}
+	return Config{model, os.Getenv("GEMINI_API_KEY"), in, out, max, img, imgRate}, nil
 }
 func migrate(db *sql.DB) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -109,6 +122,13 @@ func migrate(db *sql.DB) error {
 		return e
 	}
 	b, readErr = migrations.ReadFile("migrations/20261025000000_research.sql")
+	if readErr != nil {
+		return readErr
+	}
+	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
+		return e
+	}
+	b, readErr = migrations.ReadFile("migrations/20261026000000_images.sql")
 	if readErr != nil {
 		return readErr
 	}

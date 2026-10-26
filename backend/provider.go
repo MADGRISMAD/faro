@@ -41,6 +41,7 @@ type ProviderResult struct {
 type Provider interface {
 	Create(context.Context, Prompt, Config) ProviderResult
 	Research(context.Context, ResearchInput, Config) ResearchResult
+	Image(context.Context, ImagePrompt, Config) ImageResult
 }
 type Mock struct{}
 

@@ -66,3 +66,12 @@ La llave privada existente respondió a `models.list`: `gemini-3.8-flash` estaba
 ## Decisiones y límites de esta fase
 
 El sitio de ejemplo demuestra el proxy y el widget; cada sitio real debe apuntar su ruta del blog al frontend y cargar el script desde el host de FaroContenido. Antes de abrir registros a clientes externos hace falta verificar la propiedad de los dominios. El límite de intentos vive en memoria del proceso API, adecuado para esta instancia local. No se añadieron redes sociales, CMS, pagos, voz, video ni despliegue.
+
+
+## Pegar una URL y que la IA haga el resto (octubre 2026)
+
+- **Investigación automática:** en el panel solo se pega la dirección del sitio (con o sin `https`/`www`). Un job lee el sitio con protección SSRF, Gemini deduce negocio, público, tono, zona y temas, y arranca el autopiloto.
+- **Autopiloto prudente:** 1 artículo al inicio, 1 por semana las dos primeras semanas y máximo 3 por semana después. En sectores de salud, legal o finanzas, o si el artículo sale corto (<500 palabras), queda en borrador.
+- **Imagen de portada:** una por artículo con `gemini-3.1-flash-lite-image` (Nano Banana 2 Lite), ilustración sin texto, guardada como JPEG. Se puede apagar y elegir estilo en *Brand DNA*. Costo medido: ~US$0.047 por imagen. `GEMINI_IMAGE_MODEL=off` la desactiva globalmente.
+- **Panel:** Inicio, Brand DNA, Calendario, Artículos, Palabras clave y Ajustes.
+- **E2E sin gastar:** `docker-compose -f compose.yaml -f compose.mock.yaml up -d --build worker` y luego `npx playwright test` en `frontend/`.

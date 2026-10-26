@@ -213,12 +213,13 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var budget, spent, reserved int64
-	e := a.DB.QueryRowContext(r.Context(), `SELECT budget_microusd,spent_microusd,reserved_microusd FROM tenants WHERE id=$1`, tenant).Scan(&budget, &spent, &reserved)
+	var email string
+	e := a.DB.QueryRowContext(r.Context(), `SELECT t.budget_microusd,t.spent_microusd,t.reserved_microusd,u.email FROM tenants t,users u WHERE t.id=$1 AND u.id=$2`, tenant, user).Scan(&budget, &spent, &reserved, &email)
 	if e != nil {
 		dbError(w, e)
 		return
 	}
-	jsonResponse(w, 200, map[string]any{"user_id": user, "tenant_id": tenant, "budget_microusd": budget, "spent_microusd": spent, "reserved_microusd": reserved})
+	jsonResponse(w, 200, map[string]any{"user_id": user, "tenant_id": tenant, "email": email, "budget_microusd": budget, "spent_microusd": spent, "reserved_microusd": reserved})
 }
 func (a *App) logout(w http.ResponseWriter, r *http.Request) {
 	_, _, ok := a.auth(w, r, true)

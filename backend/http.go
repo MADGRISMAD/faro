@@ -27,6 +27,8 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("POST /sites/analyze", a.analyzeSite)
 	m.HandleFunc("GET /sites/{id}/research", a.siteResearch)
 	m.HandleFunc("PATCH /sites/{id}/autopilot", a.setAutopilot)
+	m.HandleFunc("PATCH /sites/{id}/brand", a.patchBrand)
+	m.HandleFunc("GET /sites/{id}/calendar", a.siteCalendar)
 	m.HandleFunc("POST /sites/{id}/generations", a.generate)
 	m.HandleFunc("GET /jobs/{id}", a.job)
 	m.HandleFunc("GET /articles", a.articles)
@@ -38,6 +40,8 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("GET /public/domain/{domain}", a.publicDomain)
 	m.HandleFunc("GET /public/sites/{id}/articles", a.publicArticles)
 	m.HandleFunc("GET /public/sites/{id}/articles/{slug}", a.publicArticle)
+	m.HandleFunc("GET /public/sites/{id}/articles/{slug}/image", a.publicArticleImage)
+	m.HandleFunc("GET /articles/{id}/image", a.articleImage)
 	m.HandleFunc("GET /api/embed/{id}", a.embed)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -272,16 +276,17 @@ type Article struct {
 	ID, SiteID, Title, Slug, MetaDescription, Summary, Status string
 	Content                                                   Content
 	PublishedAt                                               *time.Time
+	HasImage                                                  bool
 }
 
 func articleJSON(a Article) map[string]any {
-	return map[string]any{"id": a.ID, "site_id": a.SiteID, "title": a.Title, "slug": a.Slug, "meta_description": a.MetaDescription, "summary": a.Summary, "content": a.Content, "status": a.Status, "published_at": a.PublishedAt}
+	return map[string]any{"id": a.ID, "site_id": a.SiteID, "title": a.Title, "slug": a.Slug, "meta_description": a.MetaDescription, "summary": a.Summary, "content": a.Content, "status": a.Status, "published_at": a.PublishedAt, "has_image": a.HasImage}
 }
 func scanArticle(rows *sql.Rows) (Article, error) {
 	var a Article
 	var data []byte
 	var published sql.NullTime
-	e := rows.Scan(&a.ID, &a.SiteID, &a.Title, &a.Slug, &a.MetaDescription, &a.Summary, &data, &a.Status, &published)
+	e := rows.Scan(&a.ID, &a.SiteID, &a.Title, &a.Slug, &a.MetaDescription, &a.Summary, &data, &a.Status, &published, &a.HasImage)
 	if e != nil {
 		return a, e
 	}
@@ -292,7 +297,7 @@ func scanArticle(rows *sql.Rows) (Article, error) {
 	return a, e
 }
 
-const articleCols = "id,site_id,title,slug,meta_description,summary,content,status,published_at"
+const articleCols = "id,site_id,title,slug,meta_description,summary,content,status,published_at,has_image"
 
 func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 	_, t, ok := a.auth(w, r, false)
@@ -452,7 +457,7 @@ func (a *App) publicArticles(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,title,slug,summary,published_at FROM articles WHERE site_id=$1 AND status='published' ORDER BY published_at DESC LIMIT 100`, id)
+	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,title,slug,summary,published_at,has_image FROM articles WHERE site_id=$1 AND status='published' ORDER BY published_at DESC LIMIT 100`, id)
 	if e != nil {
 		dbError(w, e)
 		return
@@ -462,11 +467,12 @@ func (a *App) publicArticles(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var article, title, slug, summary string
 		var published time.Time
-		if e = rows.Scan(&article, &title, &slug, &summary, &published); e != nil {
+		var hasImage bool
+		if e = rows.Scan(&article, &title, &slug, &summary, &published, &hasImage); e != nil {
 			dbError(w, e)
 			return
 		}
-		list = append(list, map[string]any{"id": article, "title": title, "slug": slug, "summary": summary, "published_at": published})
+		list = append(list, map[string]any{"id": article, "title": title, "slug": slug, "summary": summary, "published_at": published, "has_image": hasImage})
 	}
 	jsonResponse(w, 200, list)
 }

@@ -1,52 +1,77 @@
 <script lang="ts">
- import {onMount} from 'svelte';import {api} from '#lib/api';
- type Site={id:string,name:string,domain:string,canonical_url:string,blog_prefix:string,brand_description:string,tone:string};
- type Article={id:string,site_id:string,title:string,slug:string,meta_description:string,summary:string,content:{intro:string,sections:{heading:string,paragraphs:string[],bullets:string[]}[],faq:{question:string,answer:string}[]},status:string};
- let widgetHost='';let user:any=null,sites:Site[]=[],articles:Article[]=[],selected:Article|null=null,mode:'login'|'register'='register';let email='',password='',error='',notice='',busy=false,jobId='',pollTimer:ReturnType<typeof setInterval>|undefined;
- let editingSite=false,editName='',editDomain='',editCanonical='',editPrefix='/blog',editBrand='',editTone='';let siteName='',domain='',canonicalUrl='',blogPrefix='/blog',brandDescription='',tone='';let siteId='',topic='',business='',audience='',keyword='';
- async function refresh(){try{user=await api('/auth/me');sites=await api('/sites');articles=await api('/articles');if(!siteId&&sites[0])siteId=sites[0].id;if(siteId&&!researchTimer)watchResearch()}catch{user=null}}
- onMount(()=>{widgetHost=location.origin;refresh();return()=>{if(pollTimer)clearInterval(pollTimer);if(researchTimer)clearInterval(researchTimer)}});
- async function authenticate(){busy=true;error='';try{const result=await api(`/auth/${mode}`,{method:'POST',body:JSON.stringify({email,password})});localStorage.setItem('faro_csrf',result.csrf);password='';await refresh();notice='Tu cuenta está lista.'}catch(e){error=(e as Error).message}finally{busy=false}}
- async function createSite(){busy=true;error='';try{const result=await api('/sites',{method:'POST',body:JSON.stringify({name:siteName,domain,canonical_url:canonicalUrl,blog_prefix:blogPrefix,brand_description:brandDescription,tone})});siteId=result.id;await refresh();notice='Sitio creado. Copia su UUID para integrar el widget.'}catch(e){error=(e as Error).message}finally{busy=false}}
- function beginSiteEdit(){const s=sites.find(s=>s.id===siteId);if(!s)return;editName=s.name;editDomain=s.domain;editCanonical=s.canonical_url;editPrefix=s.blog_prefix;editBrand=s.brand_description;editTone=s.tone;editingSite=true}
- async function saveSite(){busy=true;error='';try{await api(`/sites/${siteId}`,{method:'PATCH',body:JSON.stringify({name:editName,domain:editDomain,canonical_url:editCanonical,blog_prefix:editPrefix,brand_description:editBrand,tone:editTone})});await refresh();editingSite=false;notice='Sitio actualizado.'}catch(e){error=(e as Error).message}finally{busy=false}}
- async function generate(){busy=true;error='';notice='';try{const key=crypto.randomUUID();const result=await api(`/sites/${siteId}/generations`,{method:'POST',headers:{'idempotency-key':key},body:JSON.stringify({topic,business,audience,keyword:keyword||null})});jobId=result.job_id;notice='Generación en cola. Puedes esperar aquí.';pollTimer=setInterval(checkJob,1000);await checkJob()}catch(e){error=(e as Error).message}finally{busy=false}}
- async function checkJob(){if(!jobId)return;try{const j=await api(`/jobs/${jobId}`);if(j.status==='done'){if(pollTimer)clearInterval(pollTimer);jobId='';notice='Borrador listo para revisar.';await refresh();selected=await api(`/articles/${j.article_id}`)}else if(j.status==='failed'){if(pollTimer)clearInterval(pollTimer);jobId='';error=j.error||'Falló la generación'}}catch(e){error=(e as Error).message}}
- async function selectArticle(id:string){error='';selected=await api(`/articles/${id}`)}
- async function save(){if(!selected)return;busy=true;error='';try{await api(`/articles/${selected.id}`,{method:'PATCH',body:JSON.stringify({title:selected.title,slug:selected.slug,meta_description:selected.meta_description,summary:selected.summary,content:selected.content})});notice='Cambios guardados.';await refresh()}catch(e){error=(e as Error).message}finally{busy=false}}
- async function transition(action:'approve'|'publish'){if(!selected)return;busy=true;error='';try{await api(`/articles/${selected.id}/${action}`,{method:'POST'});selected=await api(`/articles/${selected.id}`);notice=action==='approve'?'Artículo aprobado.':'Artículo publicado.';await refresh()}catch(e){error=(e as Error).message}finally{busy=false}}
- function articleURL(a:Article){const site=sites.find(s=>s.id===a.site_id);return site?`${site.canonical_url}${site.blog_prefix}/${a.slug}`:'#'}
- async function logout(){try{await api('/auth/logout',{method:'POST'})}catch{}localStorage.removeItem('faro_csrf');user=null;selected=null}
+	import { api } from '#lib/api';
+	import { research, calendar, articles, siteId, user, refreshSite, intentName } from '#lib/app';
 
- type Topic={title:string,keyword:string,intent:string,why:string};
- type Research={status:string,error:string,autopilot:boolean,auto_publish:boolean,posts_per_week:number,articles_pending:number,articles_done:number,research?:{name:string,business:string,audience:string,tone:string,location:string,offerings:string[],topics:Topic[],sensitive:boolean,sensitive_reason:string}};
- const intentName:Record<string,string>={informational:'Informativo',comparison:'Comparación',purchase:'Compra',local:'Local'};
- let siteUrl='',addingSite=false,research:Research|null=null,researchTimer:ReturnType<typeof setInterval>|undefined;
- async function loadResearch(){if(!siteId){research=null;return}try{research=await api(`/sites/${siteId}/research`);if(research?.status==='done'&&research.articles_pending>0)await refreshArticles()}catch{research=null}}
- async function refreshArticles(){try{articles=await api('/articles')}catch{}}
- function watchResearch(){if(researchTimer)clearInterval(researchTimer);loadResearch();researchTimer=setInterval(async()=>{await loadResearch();if(research&&research.status!=='queued'&&research.status!=='running'&&!research.articles_pending){clearInterval(researchTimer);researchTimer=undefined}},2500)}
- async function analyzeSite(){busy=true;error='';notice='';try{const r=await api('/sites/analyze',{method:'POST',body:JSON.stringify({url:siteUrl})});siteId=r.site_id;siteUrl='';addingSite=false;sites=await api('/sites');watchResearch()}catch(e){error=(e as Error).message}finally{busy=false}}
- async function setAutopilot(enabled:boolean,perWeek:number){try{await api(`/sites/${siteId}/autopilot`,{method:'PATCH',body:JSON.stringify({enabled,posts_per_week:perWeek})});await loadResearch()}catch(e){error=(e as Error).message}}
+	let error = '';
+	$: r = $research;
+	$: cal = $calendar;
+	$: published = $articles.filter((a) => a.status === 'published');
+	$: drafts = $articles.filter((a) => a.status !== 'published');
+	$: recent = [...$articles].sort((a, b) => (b.published_at || '').localeCompare(a.published_at || '')).slice(0, 3);
+	$: left = $user ? ($user.budget_microusd - $user.spent_microusd - $user.reserved_microusd) / 1e6 : 0;
+	$: working = r && (r.status === 'queued' || r.status === 'running');
+
+	const day = (s: string) => new Date(s).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'short' });
+	async function toggle(enabled: boolean) {
+		error = '';
+		try {
+			await api(`/sites/${$siteId}/autopilot`, { method: 'PATCH', body: JSON.stringify({ enabled, posts_per_week: r?.posts_per_week || 2 }) });
+			await refreshSite();
+		} catch (e) {
+			error = (e as Error).message;
+		}
+	}
 </script>
-<svelte:head><title>Panel editorial | FaroContenido</title><meta name="robots" content="noindex" /></svelte:head>
-<main><div class="panel-title"><div><p class="eyebrow">Espacio editorial</p><h1>Tu contenido, en orden.</h1></div>{#if user}<button class="btn secondary" onclick={logout}>Cerrar sesión</button>{/if}</div>
- {#if error}<p class="error" role="alert">{error}</p>{/if}{#if notice}<p class="success" role="status">{notice}</p>{/if}
- {#if !user}<div class="card" style="max-width:470px"><div style="display:flex;gap:10px;margin-bottom:20px"><button class:secondary={mode!=='register'} class="btn" onclick={()=>mode='register'}>Crear cuenta</button><button class:secondary={mode!=='login'} class="btn" onclick={()=>mode='login'}>Entrar</button></div><form class="stack" onsubmit={(e)=>{e.preventDefault();authenticate()}}><label>Correo electrónico<input type="email" bind:value={email} required maxlength="254" /></label><label>Contraseña<input type="password" bind:value={password} required minlength="12" maxlength="128" /></label><button class="btn" disabled={busy}>{busy?'Espera…':mode==='register'?'Crear cuenta':'Entrar'}</button></form></div>
- {:else}
- <p class="muted small">Presupuesto disponible: US${((user.budget_microusd-user.spent_microusd-user.reserved_microusd)/1e6).toFixed(4)} · Consumido: US${(user.spent_microusd/1e6).toFixed(4)}</p>
- {#if !sites.length||addingSite}<section class="card" style="margin-top:30px;max-width:720px"><p class="eyebrow">Empieza aquí</p><h2>Pega la dirección de tu sitio</h2><p class="muted">La IA lee tu sitio, entiende tu negocio y arranca tu blog sola. No tienes que llenar nada más.</p><form onsubmit={(e)=>{e.preventDefault();analyzeSite()}} style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><input bind:value={siteUrl} required maxlength="300" placeholder="tusitio.com" aria-label="Dirección de tu sitio" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:220px" /><button class="btn" disabled={busy}>{busy?'Enviando…':'Analizar mi sitio'}</button></form><p class="muted small" style="margin-top:10px">Sirve con o sin https, con www o sin él.</p>{#if addingSite&&sites.length}<button class="btn secondary" style="margin-top:12px" onclick={()=>addingSite=false}>Cancelar</button>{/if}</section>{/if}
- {#if sites.length&&research}<section class="card" style="margin-top:30px"><div class="panel-title"><div><p class="eyebrow">{sites.find(s=>s.id===siteId)?.domain}</p><h2>{research.research?.name||'Analizando tu sitio'}</h2></div><button class="btn secondary" onclick={()=>addingSite=true}>Añadir otro sitio</button></div>
- {#if research.status==='queued'||research.status==='running'}<p role="status">Leyendo tu sitio, entendiendo tu negocio y planeando los primeros artículos… (tarda menos de un minuto)</p>
- {:else if research.status==='failed'}<p class="error" role="alert">{research.error||'No pude analizar el sitio.'}</p><button class="btn" onclick={()=>addingSite=true}>Probar con otra dirección</button>
- {:else if research.research}<div class="stack"><p>{research.research.business}</p><p class="muted small"><strong>Público:</strong> {research.research.audience} · <strong>Tono:</strong> {research.research.tone} · <strong>Zona:</strong> {research.research.location}</p>{#if research.research.offerings.length}<p class="muted small"><strong>Ofrece:</strong> {research.research.offerings.join(', ')}</p>{/if}
- <label style="display:flex;flex-direction:row;gap:10px;align-items:center"><input type="checkbox" style="width:auto;flex:none" checked={research.autopilot} onchange={(e)=>setAutopilot(e.currentTarget.checked,research?.posts_per_week||3)} /> {research.auto_publish?'Piloto automático: escribe y publica solo':'Piloto automático: escribe borradores para que los revises'}</label>{#if !research.auto_publish&&research.research.sensitive}<p class="muted small">Tu negocio es del sector salud, legal o financiero ({research.research.sensitive_reason}). Google exige experiencia y revisión de un profesional en esos temas, así que nada se publica sin que lo apruebes.</p>{/if}
- {#if research.autopilot}<label style="display:flex;flex-direction:row;gap:10px;align-items:center">Artículos por semana <select style="width:auto" value={research.posts_per_week} onchange={(e)=>setAutopilot(true,Number(e.currentTarget.value))}>{#each [1,2,3] as n}<option value={n}>{n}</option>{/each}</select></label><p class="muted small">Las primeras dos semanas sale 1 por semana y nunca más de 3: un ritmo constante y moderado le sienta mejor a Google que publicar mucho de golpe.</p>{/if}
- {#if research.articles_pending}<p role="status">Escribiendo artículos… ({research.articles_pending} en camino, {research.articles_done} listos)</p>{/if}
- <details><summary>Temas que la IA eligió ({research.research.topics.length})</summary><ul class="article-list">{#each research.research.topics as t}<li><strong>{t.title}</strong> <span class="muted small">· {intentName[t.intent]||t.intent} · palabra clave: {t.keyword}</span><br /><span class="muted small">{t.why}</span></li>{/each}</ul></details></div>{/if}</section>{/if}
- <details class="card" style="margin-top:30px"><summary>Modo manual (avanzado)</summary><div class="grid" style="margin-top:20px"><section class="card"><p class="eyebrow">Configuración</p><h2>Tu sitio</h2>{#if sites.length}<label>Selecciona un sitio<select bind:value={siteId}>{#each sites as site}<option value={site.id}>{site.name}</option>{/each}</select></label><p class="small muted">UUID público: <code>{siteId}</code></p><p class="small">Widget: <code>&lt;div id="faro-blog"&gt;&lt;/div&gt;</code><br/><code>&lt;script src="{widgetHost}/api/embed/{siteId}.js" defer&gt;&lt;/script&gt;</code></p><button class="btn secondary" onclick={beginSiteEdit}>Editar sitio</button>{#if editingSite}<form class="stack" style="margin-top:16px" onsubmit={(e)=>{e.preventDefault();saveSite()}}><label>Nombre del sitio<input bind:value={editName} required maxlength="120" /></label><label>Dominio del sitio<input bind:value={editDomain} required maxlength="253" /></label><label>URL canónica del sitio<input type="url" bind:value={editCanonical} required /></label><label>Prefijo del blog<input bind:value={editPrefix} required /></label><label>Descripción de marca<textarea bind:value={editBrand} maxlength="2000"></textarea></label><label>Tono<textarea bind:value={editTone} maxlength="500"></textarea></label><button class="btn" disabled={busy}>Guardar cambios del sitio</button></form>{/if}{/if}<details open={!sites.length}><summary>Agregar sitio</summary><form class="stack" style="margin-top:16px" onsubmit={(e)=>{e.preventDefault();createSite()}}><label>Nombre<input bind:value={siteName} required maxlength="120" /></label><label>Dominio <span class="muted small">Ejemplo: localhost:18082</span><input bind:value={domain} required maxlength="253" /></label><label>URL canónica<input type="url" bind:value={canonicalUrl} required placeholder="http://localhost:18082" /></label><label>Prefijo del blog<input bind:value={blogPrefix} required /></label><label>Descripción de marca<textarea bind:value={brandDescription} maxlength="2000"></textarea></label><label>Tono<textarea bind:value={tone} maxlength="500"></textarea></label><button class="btn" disabled={busy}>Guardar sitio</button></form></details></section>
- <section class="card"><p class="eyebrow">Crear</p><h2>Nuevo artículo</h2>{#if !sites.length}<p class="muted">Primero agrega un sitio.</p>{:else}<form class="stack" onsubmit={(e)=>{e.preventDefault();generate()}}><label>Tema<input bind:value={topic} required maxlength="300" /></label><label>Negocio<input bind:value={business} required maxlength="500" /></label><label>Público<input bind:value={audience} required maxlength="300" /></label><label>Palabra clave principal (opcional)<input bind:value={keyword} maxlength="120" /></label><button class="btn" disabled={busy||!!jobId}>{jobId?'Generando…':busy?'Enviando…':'Generar borrador'}</button></form>{/if}</section></div>
- </details>
- <section style="margin-top:45px"><p class="eyebrow">Revisión</p><h2>Artículos</h2>{#if !articles.length}<div class="card"><p>Aún no tienes artículos. Genera el primero para empezar.</p></div>{:else}<div class="card"><ul class="article-list">{#each articles as a}<li><button class="btn secondary" style="float:right" onclick={()=>selectArticle(a.id)}>Abrir</button><strong>{a.title}</strong><p class="muted">{a.summary}</p><span class="pill">{a.status==='draft'?'Borrador':a.status==='approved'?'Aprobado':'Publicado'}</span></li>{/each}</ul></div>{/if}</section>
- {#if selected}<section class="card" style="margin-top:30px"><div class="panel-title"><div><p class="eyebrow">Editor</p><h2>{selected.title}</h2></div><button class="btn secondary" onclick={()=>selected=null}>Cerrar</button></div><div class="stack"><label>Título<input bind:value={selected.title} disabled={selected.status==='published'} /></label><label>Slug<input bind:value={selected.slug} disabled={selected.status==='published'} /></label><label>Meta description<textarea bind:value={selected.meta_description} disabled={selected.status==='published'}></textarea></label><label>Resumen<textarea bind:value={selected.summary} disabled={selected.status==='published'}></textarea></label><label>Introducción<textarea bind:value={selected.content.intro} disabled={selected.status==='published'}></textarea></label>{#each selected.content.sections as section}<div class="card"><label>Encabezado<input bind:value={section.heading} disabled={selected.status==='published'} /></label>{#each section.paragraphs as paragraph,i}<label>Párrafo<textarea bind:value={section.paragraphs[i]} disabled={selected.status==='published'}></textarea></label>{/each}{#each section.bullets as bullet,i}<label>Viñeta<input bind:value={section.bullets[i]} disabled={selected.status==='published'} /></label>{/each}</div>{/each}{#each selected.content.faq as faq}<div class="card"><label>Pregunta<input bind:value={faq.question} disabled={selected.status==='published'} /></label><label>Respuesta<textarea bind:value={faq.answer} disabled={selected.status==='published'}></textarea></label></div>{/each}<div style="display:flex;gap:10px;flex-wrap:wrap">{#if selected.status!=='published'}<button class="btn secondary" onclick={save} disabled={busy}>Guardar cambios</button>{/if}{#if selected.status==='draft'}<button class="btn" onclick={()=>transition('approve')} disabled={busy}>Aprobar</button>{/if}{#if selected.status==='approved'}<button class="btn" onclick={()=>transition('publish')} disabled={busy}>Publicar</button>{/if}{#if selected.status==='published'}<a class="btn" href={articleURL(selected)}>Ver en el blog</a>{/if}</div></div></section>{/if}
- {/if}
-</main>
+
+<div class="view">
+	<h1>Inicio</h1>
+	<p class="sub">La IA se encarga de tu contenido. Aquí ves cómo va.</p>
+
+	{#if working}
+		<div class="panel" role="status"><span class="spin"></span>Leyendo tu sitio, entendiendo tu negocio y eligiendo los primeros temas… tarda menos de un minuto.</div>
+	{:else if r?.status === 'failed'}
+		<div class="panel"><p class="error" role="alert">{r.error || 'No pude analizar el sitio.'}</p></div>
+	{:else if r}
+		<div class="kpis">
+			<div class="kpi"><span>Artículos publicados</span><b>{published.length}</b></div>
+			<div class="kpi"><span>Borradores por revisar</span><b>{drafts.length}</b></div>
+			<div class="kpi"><span>Programados</span><b>{cal?.upcoming.length ?? 0}</b></div>
+			<div class="kpi"><span>Crédito de IA disponible</span><b>US${left.toFixed(2)}</b></div>
+		</div>
+
+		{#if r.research?.sensitive && !r.auto_publish}
+			<div class="panel" style="margin-bottom:18px"><b>Sector sensible ({r.research.sensitive_reason || 'salud, legal o finanzas'}).</b> <span class="muted">Google pide experiencia y revisión de un profesional en estos temas, así que los artículos quedan en borrador hasta que los apruebes.</span></div>
+		{/if}
+
+		<div class="row" style="margin-bottom:14px">
+			<h2 style="font-size:1.3rem;margin:0">Artículos <span class="muted" style="font-size:.9rem;font-family:'DM Sans'">· {r.posts_per_week} por semana</span></h2>
+			<label class="switch">Piloto automático <input type="checkbox" checked={r.autopilot} on:change={(e) => toggle(e.currentTarget.checked)} /></label>
+		</div>
+		{#if error}<p class="error" role="alert">{error}</p>{/if}
+
+		{#if cal?.generating.length}
+			<div class="panel" role="status" style="margin-bottom:14px"><span class="spin"></span>Escribiendo ahora: <b>{cal.generating[0].title}</b>{#if r.images_pending} · preparando su imagen{/if}</div>
+		{/if}
+
+		{#if recent.length}
+			<div class="feed">
+				{#each recent as a}
+					<a class="post" href="/dashboard/articulos?abrir={a.id}">
+						{#if a.has_image}<img class="thumb" src={`/api/articles/${a.id}/image`} alt="" loading="lazy" />{:else}<div class="thumb empty">{r.images_pending ? 'Creando imagen…' : 'Sin imagen'}</div>{/if}
+						<div><h3>{a.title}</h3><p>{a.summary}</p><p style="margin-top:8px"><span class="chip {a.status}">{a.status === 'published' ? 'Publicado' : a.status === 'approved' ? 'Aprobado' : 'Borrador'}</span></p></div>
+					</a>
+				{/each}
+			</div>
+		{:else if !cal?.generating.length}
+			<div class="panel"><p class="muted" style="margin:0">Todavía no hay artículos. {r.autopilot ? 'El primero está por salir.' : 'Enciende el piloto automático o crea uno en Artículos.'}</p></div>
+		{/if}
+
+		{#if cal?.upcoming.length}
+			<h2 style="font-size:1.3rem;margin:34px 0 0">Próximos</h2>
+			{#each cal.upcoming.slice(0, 4) as u}
+				<div class="dayline">{day(u.at)}</div>
+				<div class="post plan"><div class="thumb empty">Se creará al escribirlo</div><div><h3>{u.title}</h3><p>{intentName[u.intent] || u.intent} · palabra clave: {u.keyword}</p></div></div>
+			{/each}
+		{/if}
+	{/if}
+</div>

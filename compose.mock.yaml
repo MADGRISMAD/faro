@@ -1,0 +1,7 @@
+# Pruebas E2E sin gastar: el worker usa el proveedor simulado (texto e imagen).
+#   docker-compose -f compose.yaml -f compose.mock.yaml up -d --build worker
+services:
+  worker:
+    environment:
+      GEMINI_MODEL: mock
+      GEMINI_API_KEY: ""

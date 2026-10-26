@@ -176,7 +176,7 @@ func TestAutopilotNoPublicaSensibleNiFlaco(t *testing.T) {
 	_, res, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": "clinica-" + token()[:8] + ".test"}, cookie, csrf, "")
 	siteID := res["site_id"].(string)
 	app.DB.Exec(`UPDATE jobs SET status='failed' WHERE site_id=$1 AND kind='research'`, siteID) // la investigación no es lo que se prueba aquí
-	run := func(_ int) string { // escribe un artículo del sitio y devuelve su estado
+	run := func(_ int) string {                                                                 // escribe un artículo del sitio y devuelve su estado
 		var id string
 		app.DB.QueryRow(`INSERT INTO jobs(tenant_id,site_id,idempotency_key,topic,business,audience,kind) VALUES($1,$2,$3,'Tema','Negocio','Público','article') RETURNING id`, tenant, siteID, token()).Scan(&id)
 		var j *WorkItem

@@ -13,10 +13,10 @@ import (
 )
 
 type WorkItem struct {
-	ID, Tenant, Site, Kind string
-	Attempt                int
-	Prompt                 Prompt
-	Reserve                int64
+	ID, Tenant, Site, Kind, Article string
+	Attempt                         int
+	Prompt                          Prompt
+	Reserve                         int64
 }
 
 func (a *App) claim(ctx context.Context) (*WorkItem, error) {
@@ -26,8 +26,8 @@ func (a *App) claim(ctx context.Context) (*WorkItem, error) {
 	}
 	defer tx.Rollback()
 	var j WorkItem
-	var keyword sql.NullString
-	e = tx.QueryRowContext(ctx, `SELECT j.id,j.tenant_id,j.site_id,j.attempts,j.topic,j.business,j.audience,j.keyword,s.brand_description,s.tone,j.kind FROM jobs j JOIN sites s ON s.id=j.site_id WHERE j.status='queued' AND NOT EXISTS(SELECT 1 FROM jobs r WHERE r.tenant_id=j.tenant_id AND r.status='running') ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&j.ID, &j.Tenant, &j.Site, &j.Attempt, &j.Prompt.Topic, &j.Prompt.Business, &j.Prompt.Audience, &keyword, &j.Prompt.Brand, &j.Prompt.Tone, &j.Kind)
+	var keyword, article sql.NullString
+	e = tx.QueryRowContext(ctx, `SELECT j.id,j.tenant_id,j.site_id,j.attempts,j.topic,j.business,j.audience,j.keyword,s.brand_description,s.tone,j.kind,j.article_id FROM jobs j JOIN sites s ON s.id=j.site_id WHERE j.status='queued' AND NOT EXISTS(SELECT 1 FROM jobs r WHERE r.tenant_id=j.tenant_id AND r.status='running') ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&j.ID, &j.Tenant, &j.Site, &j.Attempt, &j.Prompt.Topic, &j.Prompt.Business, &j.Prompt.Audience, &keyword, &j.Prompt.Brand, &j.Prompt.Tone, &j.Kind, &article)
 	if errors.Is(e, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -37,7 +37,11 @@ func (a *App) claim(ctx context.Context) (*WorkItem, error) {
 	if keyword.Valid {
 		j.Prompt.Keyword = keyword.String
 	}
+	j.Article = article.String
 	j.Reserve = reserveAmount(a.Config)
+	if j.Kind == "image" {
+		j.Reserve = imageReserve
+	}
 	var result sql.Result
 	result, e = tx.ExecContext(ctx, `UPDATE tenants SET reserved_microusd=reserved_microusd+$1 WHERE id=$2 AND budget_microusd-spent_microusd-reserved_microusd>=$1`, j.Reserve, j.Tenant)
 	if e != nil {
@@ -188,6 +192,12 @@ func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 	if e != nil {
 		return e
 	}
+	if a.Config.ImageModel != "" { // una imagen por artículo (si el cliente no la apagó), en su propio job para medir y limitar su costo
+		_, e = tx.ExecContext(ctx, `INSERT INTO jobs(tenant_id,site_id,idempotency_key,topic,business,audience,kind,article_id) SELECT $1,$2,$3,$4,$5,$6,'image',$7 FROM sites WHERE id=$2 AND images_enabled ON CONFLICT(tenant_id,idempotency_key) DO NOTHING`, j.Tenant, j.Site, "img-"+article, clean(g.Title, 180), j.Prompt.Business, j.Prompt.Audience, article)
+		if e != nil {
+			return e
+		}
+	}
 	return tx.Commit()
 }
 func (a *App) Work(ctx context.Context) {
@@ -220,6 +230,10 @@ func (a *App) Work(ctx context.Context) {
 		}
 		if j.Kind == "research" {
 			a.runResearch(ctx, j)
+			continue
+		}
+		if j.Kind == "image" {
+			a.runImage(ctx, j)
 			continue
 		}
 		callCtx, cancel := context.WithTimeout(ctx, 90*time.Second)

@@ -571,9 +571,10 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var blob []byte
-	var auto, autoPublish bool
+	var auto, autoPublish, images bool
 	var perWeek int
-	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish)
+	var avoid, imgStyle, imgNotes string
+	e := a.DB.QueryRowContext(r.Context(), `SELECT research,autopilot,posts_per_week,auto_publish,images_enabled,image_style,image_notes,avoid_topics FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &auto, &perWeek, &autoPublish, &images, &imgStyle, &imgNotes, &avoid)
 	if errors.Is(e, sql.ErrNoRows) {
 		fail(w, 404, "Sitio no encontrado")
 		return
@@ -591,14 +592,14 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		dbError(w, e)
 		return
 	}
-	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String}
+	out := map[string]any{"status": status, "autopilot": auto, "auto_publish": autoPublish, "posts_per_week": perWeek, "error": msg.String, "images_enabled": images, "image_style": imgStyle, "image_notes": imgNotes, "avoid_topics": avoid}
 	if blob != nil {
 		out["research"] = json.RawMessage(blob)
 	}
 	// avance de los artículos que arrancó el autopiloto
-	var queued, done int
-	_ = a.DB.QueryRowContext(r.Context(), `SELECT count(*) FILTER (WHERE status IN ('queued','running')),count(*) FILTER (WHERE status='done') FROM jobs WHERE site_id=$1 AND tenant_id=$2 AND kind='article'`, site, t).Scan(&queued, &done)
-	out["articles_pending"], out["articles_done"] = queued, done
+	var queued, done, imgs int
+	_ = a.DB.QueryRowContext(r.Context(), `SELECT count(*) FILTER (WHERE kind='article' AND status IN ('queued','running')),count(*) FILTER (WHERE kind='article' AND status='done'),count(*) FILTER (WHERE kind='image' AND status IN ('queued','running')) FROM jobs WHERE site_id=$1 AND tenant_id=$2`, site, t).Scan(&queued, &done, &imgs)
+	out["articles_pending"], out["articles_done"], out["images_pending"] = queued, done, imgs
 	jsonResponse(w, 200, out)
 }
 
@@ -631,4 +632,207 @@ func (a *App) setAutopilot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, 200, map[string]any{"autopilot": x.Enabled, "posts_per_week": x.PostsPerWeek})
+}
+
+// ───────────── Brand DNA: lo que la IA dedujo, editable ─────────────
+
+type brandPatch struct {
+	Business      *string   `json:"business"`
+	Audience      *string   `json:"audience"`
+	Tone          *string   `json:"tone"`
+	Location      *string   `json:"location"`
+	Themes        *[]string `json:"themes"`
+	AvoidTopics   *string   `json:"avoid_topics"`
+	ImagesEnabled *bool     `json:"images_enabled"`
+	ImageStyle    *string   `json:"image_style"`
+	ImageNotes    *string   `json:"image_notes"`
+}
+
+func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := a.auth(w, r, true)
+	if !ok {
+		return
+	}
+	site, ok := requireUUID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	var x brandPatch
+	if !decode(w, r, &x) {
+		return
+	}
+	tx, e := a.DB.BeginTx(r.Context(), nil)
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	defer tx.Rollback()
+	var blob []byte
+	var avoid, notes, style string
+	var images bool
+	e = tx.QueryRowContext(r.Context(), `SELECT research,avoid_topics,image_notes,image_style,images_enabled FROM sites WHERE id=$1 AND tenant_id=$2 FOR UPDATE`, site, t).Scan(&blob, &avoid, &notes, &style, &images)
+	if errors.Is(e, sql.ErrNoRows) {
+		fail(w, 404, "Sitio no encontrado")
+		return
+	}
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	var p Profile
+	if blob != nil && json.Unmarshal(blob, &p) != nil {
+		dbError(w, errors.New("perfil corrupto"))
+		return
+	}
+	set := func(dst *string, src *string, max int) bool {
+		if src == nil {
+			return true
+		}
+		v := clean(strings.TrimSpace(*src), max)
+		*dst = v
+		return true
+	}
+	set(&p.Business, x.Business, 800)
+	set(&p.Audience, x.Audience, 600)
+	set(&p.Tone, x.Tone, 160)
+	set(&p.Location, x.Location, 160)
+	set(&avoid, x.AvoidTopics, 500)
+	set(&notes, x.ImageNotes, 300)
+	if x.Themes != nil {
+		p.Offerings = nil
+		for _, th := range *x.Themes {
+			if th = clean(strings.TrimSpace(th), 100); th != "" && len(p.Offerings) < 12 {
+				p.Offerings = append(p.Offerings, th)
+			}
+		}
+	}
+	if x.ImagesEnabled != nil {
+		images = *x.ImagesEnabled
+	}
+	if x.ImageStyle != nil {
+		if _, ok := imageStyles[*x.ImageStyle]; !ok {
+			fail(w, 400, "Estilo de imagen inválido")
+			return
+		}
+		style = *x.ImageStyle
+	}
+	if p.Name != "" && (!valid(p.Business, 800) || !valid(p.Audience, 600)) {
+		fail(w, 400, "El negocio y el público no pueden quedar vacíos")
+		return
+	}
+	brand := p.Business
+	if len(p.Offerings) > 0 {
+		brand += " Ofrece: " + strings.Join(p.Offerings, ", ") + "."
+	}
+	if avoid != "" {
+		brand += " Evita hablar de: " + avoid + "."
+	}
+	out, _ := json.Marshal(p)
+	var research any
+	if blob != nil {
+		research = out
+	}
+	if _, e = tx.ExecContext(r.Context(), `UPDATE sites SET research=$1,brand_description=CASE WHEN $2<>'' THEN $2 ELSE brand_description END,tone=CASE WHEN $3<>'' THEN $3 ELSE tone END,avoid_topics=$4,image_notes=$5,image_style=$6,images_enabled=$7 WHERE id=$8`, research, clean(brand, 1500), p.Tone, avoid, notes, style, images, site); e != nil {
+		dbError(w, e)
+		return
+	}
+	if e = tx.Commit(); e != nil {
+		dbError(w, e)
+		return
+	}
+	jsonResponse(w, 200, map[string]any{"ok": true})
+}
+
+// ───────────── Calendario: lo hecho, lo que se está escribiendo y lo que viene ─────────────
+
+func effectivePerWeek(created time.Time, perWeek int) int {
+	if time.Since(created) < 14*24*time.Hour {
+		return 1
+	}
+	return min(perWeek, 3)
+}
+
+func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
+	_, t, ok := a.auth(w, r, false)
+	if !ok {
+		return
+	}
+	site, ok := requireUUID(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	var blob []byte
+	var created time.Time
+	var auto bool
+	var perWeek int
+	e := a.DB.QueryRowContext(r.Context(), `SELECT research,created_at,autopilot,posts_per_week FROM sites WHERE id=$1 AND tenant_id=$2`, site, t).Scan(&blob, &created, &auto, &perWeek)
+	if errors.Is(e, sql.ErrNoRows) {
+		fail(w, 404, "Sitio no encontrado")
+		return
+	}
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	articles := []map[string]any{}
+	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,title,status,has_image,COALESCE(published_at,created_at) FROM articles WHERE site_id=$1 AND tenant_id=$2 ORDER BY 5 DESC LIMIT 200`, site, t)
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	for rows.Next() {
+		var id, title, status string
+		var img bool
+		var at time.Time
+		if e = rows.Scan(&id, &title, &status, &img, &at); e != nil {
+			rows.Close()
+			dbError(w, e)
+			return
+		}
+		articles = append(articles, map[string]any{"id": id, "title": title, "status": status, "has_image": img, "at": at})
+	}
+	rows.Close()
+	generating := []map[string]any{}
+	rows, e = a.DB.QueryContext(r.Context(), `SELECT topic,created_at FROM jobs WHERE site_id=$1 AND tenant_id=$2 AND kind='article' AND status IN ('queued','running') ORDER BY created_at`, site, t)
+	if e != nil {
+		dbError(w, e)
+		return
+	}
+	for rows.Next() {
+		var topic string
+		var at time.Time
+		if e = rows.Scan(&topic, &at); e != nil {
+			rows.Close()
+			dbError(w, e)
+			return
+		}
+		generating = append(generating, map[string]any{"title": topic, "at": at})
+	}
+	rows.Close()
+	// próximos: los temas sin usar, con la fecha en que el autopiloto los escribiría al ritmo actual
+	upcoming := []map[string]any{}
+	if auto && blob != nil {
+		var p Profile
+		_ = json.Unmarshal(blob, &p)
+		var last time.Time
+		_ = a.DB.QueryRowContext(r.Context(), `SELECT COALESCE(max(created_at),now()) FROM jobs WHERE site_id=$1 AND kind='article'`, site).Scan(&last)
+		step := time.Duration(168/effectivePerWeek(created, perWeek)) * time.Hour
+		next := last.Add(step)
+		if next.Before(time.Now()) {
+			next = time.Now().Add(time.Hour)
+		}
+		for _, tp := range p.Topics {
+			var used bool
+			if e = a.DB.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM jobs WHERE tenant_id=$1 AND idempotency_key=$2)`, t, topicKey(site, tp.Title)).Scan(&used); e != nil {
+				dbError(w, e)
+				return
+			}
+			if used || len(upcoming) >= 8 {
+				continue
+			}
+			upcoming = append(upcoming, map[string]any{"title": tp.Title, "keyword": tp.Keyword, "intent": tp.Intent, "at": next})
+			next = next.Add(step)
+		}
+	}
+	jsonResponse(w, 200, map[string]any{"articles": articles, "generating": generating, "upcoming": upcoming})
 }
