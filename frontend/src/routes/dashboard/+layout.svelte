@@ -9,6 +9,7 @@
 
 	onMount(() => {
 		here();
+		if (new URLSearchParams(location.search).get('modo') === 'entrar') mode = 'login'; // viene del botón «Iniciar sesión» de la portada
 		document.body.classList.add('in-app');
 		boot();
 	});
