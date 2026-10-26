@@ -160,7 +160,7 @@
 						<div class="cal12-grid">
 							<div class="months">{#each semanas as w}<span>{meses[w] ?? ''}</span>{/each}</div>
 							{#each dias as d, r}
-								<div class="cal12-row"><span class="dlabel">{d}</span>{#each semanas as w}<i class="sem" class:on={r === 3 || r === 6}></i>{/each}</div>
+								<div class="cal12-row"><span class="dlabel">{d}</span>{#each semanas as w}<i class="sem" class:on={r === 3 || r === 6} style="--w:{w}"></i>{/each}</div>
 							{/each}
 						</div>
 						<p class="leyenda"><i class="sq on"></i> Artículo publicado <i class="sq"></i> Sin publicación</p>
@@ -186,8 +186,8 @@
 							<svg viewBox="0 0 600 232" preserveAspectRatio="none" aria-label="Gráfica de ejemplo: las visitas desde Google suben semana a semana" role="img">
 								<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8336d" stop-opacity=".30" /><stop offset="1" stop-color="#e8336d" stop-opacity="0" /></linearGradient></defs>
 								<path d="M0 22H600M0 80H600M0 139H600" stroke="#e5d3da" stroke-width="1.3" stroke-dasharray="4 5" fill="none" />
-								<path d="M0 198C60 193 90 190 125 187S190 180 224 173S290 158 330 148S400 126 444 103S490 84 520 68S570 38 600 18L600 206L0 206Z" fill="url(#area)" stroke="none" />
-								<path d="M0 198C60 193 90 190 125 187S190 180 224 173S290 158 330 148S400 126 444 103S490 84 520 68S570 38 600 18" fill="none" stroke="#c2185b" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+								<path d="M0 198C60 193 90 190 125 187S190 180 224 173S290 158 330 148S400 126 444 103S490 84 520 68S570 38 600 18L600 206L0 206Z" class="curve" fill="url(#area)" stroke="none" />
+								<path d="M0 198C60 193 90 190 125 187S190 180 224 173S290 158 330 148S400 126 444 103S490 84 520 68S570 38 600 18" class="curve" fill="none" stroke="#c2185b" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke" />
 								<path d="M0 206H600" stroke="#dccad1" stroke-width="2" />
 							</svg>
 							<span class="endpoint"></span>
@@ -487,6 +487,54 @@
 		.chart-box>svg{height:170px}.visitas-art{padding-top:96px}.asombro{left:0}.bubble{left:112px;font-size:13.5px;padding:11px 16px}
 		.price{padding:56px 22px 28px}.amount strong{font-size:68px}.checks li{font-size:15.5px;flex-wrap:wrap}.q summary{font-size:16.5px;padding-left:22px}
 		.monthgrid span.on{width:40px}.feat2 .card,.mini,.wide{padding:28px 24px}
+	}
+
+	/* Parallax con animaciones ligadas al scroll (CSS nativo). Navegadores sin soporte o con «reducir movimiento» ven todo quieto y completo. */
+	@supports (animation-timeline: view()) {
+		@media (prefers-reduced-motion: no-preference) {
+			/* héroe: al bajar, el resultado de Faro sube y los demás se hunden; la mascota y el faro flotan a distinto ritmo */
+			.serp, .res.hit, .res.dim, .res.dimmer, .hero-mascot, .pedestal, .eyebrow, h1 { animation-timeline: scroll(root); animation-range: 0 720px; animation-fill-mode: both; animation-timing-function: linear }
+			.serp { animation-name: serp }
+			.res.hit { animation-name: hit }
+			.res.dim { animation-name: sink }
+			.res.dimmer { animation-name: sink2 }
+			.hero-mascot { animation-name: float }
+			.pedestal { animation-name: lift }
+			h1 { animation-name: drift }
+			@keyframes serp { to { transform: translateY(-70px) } }
+			@keyframes hit { to { transform: translateY(-26px) scale(1.04); box-shadow: 0 30px 50px rgba(194, 24, 91, .2) } }
+			@keyframes sink { to { transform: translateY(40px); opacity: .35 } }
+			@keyframes sink2 { to { transform: translateY(80px); opacity: .1 } }
+			@keyframes float { to { transform: translateY(-190px) rotate(-8deg) } }
+			@keyframes lift { to { transform: translateY(-110px) } }
+			@keyframes drift { to { transform: translateY(60px); opacity: .25 } }
+
+			/* tarjetas que suben a su lugar mientras entran a la pantalla, cada una con su propio desfase */
+			.step, .step4, .grows, .visitas, .feat2 .card, .mini, .wide, .q, .final { animation: rise-in linear both; animation-timeline: view(); animation-range: entry 0% entry 70% }
+			.step:nth-child(2), .feat3 .mini:nth-child(2) { animation-range: entry 10% entry 85% }
+			.step:nth-child(3), .feat3 .mini:nth-child(3) { animation-range: entry 20% entry 100% }
+			@keyframes rise-in { from { transform: translateY(90px) scale(.96); opacity: 0 } }
+
+			/* calendario: las publicaciones se van encendiendo semana por semana */
+			.cal12 { view-timeline: --cal block }
+			.sem.on { animation: pop-on linear both; animation-timeline: --cal; animation-range: cover calc(8% + var(--w) * 3%) cover calc(16% + var(--w) * 3%) }
+			@keyframes pop-on { from { transform: scale(0); background: transparent; box-shadow: none } 70% { transform: scale(1.25) } }
+
+			/* gráfica: la curva se dibuja al bajar y al final aparecen el punto y la etiqueta */
+			.chart { view-timeline: --chart block }
+			.curve { animation: draw linear both; animation-timeline: --chart; animation-range: entry 30% cover 55% }
+			.endpoint, .tip { animation: appear linear both; animation-timeline: --chart; animation-range: cover 50% cover 58% }
+			@keyframes draw { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
+			@keyframes appear { from { opacity: 0; transform: translateY(12px) scale(.6) } }
+			.asombro, .bubble { animation: peek linear both; animation-timeline: view(); animation-range: entry 0% cover 50% }
+			@keyframes peek { from { transform: translateY(80px) rotate(10deg); opacity: 0 } }
+
+			/* precios: la mascota baja a recostarse sobre la tarjeta */
+			.cruzado { animation: land linear both; animation-timeline: view(); animation-range: entry 10% cover 45% }
+			@keyframes land { from { transform: translate(-50%, -120px) rotate(-6deg); opacity: 0 } to { transform: translate(-50%, 0) } }
+			.final-art img { animation: wave linear both; animation-timeline: view(); animation-range: entry 0% cover 50% }
+			@keyframes wave { from { transform: translateY(70px) scale(.7) } }
+		}
 	}
 	@media(prefers-reduced-motion:reduce){.caret{animation:none}.btn{transition:none}}
 	:global(html){scroll-behavior:smooth}
