@@ -156,6 +156,13 @@ func migrate(db *sql.DB) error {
 	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
 		return e
 	}
+	b, readErr = migrations.ReadFile("migrations/20261030000000_facebook.sql")
+	if readErr != nil {
+		return readErr
+	}
+	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
+		return e
+	}
 	return tx.Commit()
 }
 func main() {

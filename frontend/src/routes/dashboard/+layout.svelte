@@ -112,7 +112,7 @@
 				{#each nav as [href, label]}
 					<a {href} class:on={path === href} on:click={() => (path = href)}>{label}{#if href === '/dashboard/conectar' && $research && !$research.connected}<span class="tag">Falta</span>{/if}</a>
 				{/each}
-				<span class="soon">Redes sociales <span class="tag">Pronto</span></span>
+				<a href="/dashboard/redes" class:on={path === '/dashboard/redes'} on:click={() => (path = '/dashboard/redes')}>Redes sociales</a>
 				<div class="group">Datos</div>
 				<a href="/dashboard/analytics" class:on={path === '/dashboard/analytics'} on:click={() => (path = '/dashboard/analytics')}>Analytics</a>
 				<a href="/dashboard/palabras-clave" class:on={path === '/dashboard/palabras-clave'} on:click={() => (path = '/dashboard/palabras-clave')}>Palabras clave</a>

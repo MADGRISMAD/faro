@@ -1,7 +1,13 @@
-# Pruebas E2E sin gastar: el worker usa el proveedor simulado (texto e imagen).
-#   docker-compose -f compose.yaml -f compose.mock.yaml up -d --build worker
+# Pruebas E2E sin gastar: el worker usa el proveedor simulado (texto e imagen) y Facebook simulado.
+#   docker-compose -f compose.yaml -f compose.mock.yaml up -d --build backend worker frontend
 services:
+  backend:
+    environment:
+      FACEBOOK_MODE: mock
+      TOKEN_ENCRYPTION_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
   worker:
     environment:
       GEMINI_MODEL: mock
       GEMINI_API_KEY: ""
+      FACEBOOK_MODE: mock
+      TOKEN_ENCRYPTION_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff

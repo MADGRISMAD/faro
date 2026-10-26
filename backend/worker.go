@@ -201,7 +201,7 @@ func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 	return tx.Commit()
 }
 func (a *App) Work(ctx context.Context) {
-	lastRecovery, lastAutopilot := time.Time{}, time.Time{}
+	lastRecovery, lastAutopilot, lastSocial := time.Time{}, time.Time{}, time.Time{}
 	for {
 		if ctx.Err() != nil {
 			return
@@ -211,6 +211,12 @@ func (a *App) Work(ctx context.Context) {
 				slog.Error("Recuperación de jobs", "error", e)
 			}
 			lastRecovery = time.Now()
+		}
+		if time.Since(lastSocial) > 30*time.Second {
+			if e := a.socialTick(ctx); e != nil {
+				slog.Error("Facebook", "error", e)
+			}
+			lastSocial = time.Now()
 		}
 		if time.Since(lastAutopilot) > 5*time.Minute {
 			if e := a.autopilotTick(ctx); e != nil {
