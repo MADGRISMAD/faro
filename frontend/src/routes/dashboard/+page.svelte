@@ -200,13 +200,13 @@
 	.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:22px}
 	.stat{display:flex;align-items:center;gap:16px;padding:18px 22px;border-radius:28px;background:var(--surface);box-shadow:var(--out)}
 	.stat>div{display:grid}.stat b{font-size:.98rem}
-	.num{display:grid;place-items:center;min-width:60px;height:60px;border-radius:20px;background:var(--well);box-shadow:var(--in-s);font-family:Fraunces,serif;font-size:2rem;color:var(--accent-d);padding:0 8px}
+	.num{display:grid;place-items:center;min-width:60px;height:60px;border-radius:20px;background:var(--well);box-shadow:var(--in-s);font-weight:900;font-size:2rem;color:var(--accent-d);padding:0 8px}
 	.cols{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:22px;align-items:start}
 	.queue h2,.minical h2,.seo h2,.latest h2{margin:0;font-size:1.7rem}
 	.qitem{display:flex;align-items:center;gap:16px;margin-top:14px;padding:12px 16px}
 	.datetile{display:grid;justify-items:center;width:62px;padding:8px 0;border-radius:18px;background:var(--surface);box-shadow:var(--out-s);flex:none;line-height:1}
 	.datetile small{font-size:.62rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}.datetile .mon{color:var(--accent-d)}
-	.datetile b{font-family:Fraunces,serif;font-size:1.7rem;margin:3px 0}
+	.datetile b{font-weight:900;font-size:1.7rem;margin:3px 0}
 	.meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px}
 	.more{margin:18px 0 0;text-align:center;font-weight:800}.more a{color:var(--accent-d);text-decoration:none}
 	.side-col{display:grid;gap:22px}
@@ -217,7 +217,7 @@
 	.legend{display:flex;align-items:center;gap:8px;margin:14px 0 0;font-size:.8rem;color:var(--mut)}.legend i{width:11px;height:11px;border-radius:50%;background:var(--accent-d)}
 	.seo-empty{display:grid;gap:12px;margin-top:14px;padding:18px;justify-items:start}
 	.seo-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;padding:16px;text-align:center}
-	.seo-stats div{display:grid}.seo-stats b{font-family:Fraunces,serif;font-size:1.6rem;color:var(--accent-d)}
+	.seo-stats div{display:grid}.seo-stats b{font-weight:900;font-size:1.6rem;color:var(--accent-d)}
 	.latest{display:grid;grid-template-columns:minmax(0,340px) 1fr;gap:26px;align-items:center}
 	.latest .thumb{aspect-ratio:16/9}
 	.latest p{margin:.4rem 0}.latest h2{margin:.5rem 0}
