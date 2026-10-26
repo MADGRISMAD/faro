@@ -34,5 +34,9 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$ LANGUAGE plpgsql;
-DROP TRIGGER IF EXISTS articles_social ON articles;
-CREATE TRIGGER articles_social AFTER INSERT OR UPDATE OF status ON articles FOR EACH ROW EXECUTE FUNCTION faro_queue_social();
+-- Las migraciones corren en cada arranque: crear el disparador solo si falta (recrearlo bloquea articles y choca con el autopiloto).
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'articles_social') THEN
+  CREATE TRIGGER articles_social AFTER INSERT OR UPDATE OF status ON articles FOR EACH ROW EXECUTE FUNCTION faro_queue_social();
+ END IF;
+END $$;
