@@ -42,7 +42,7 @@
 			{#each days as d}
 				{@const items = byDay[key(d)] || []}
 				<div class="cell" class:off={d.getMonth() !== month} class:today={key(d) === today}>
-					<div class="n"><span>{d.getDate()}</span>{#if key(d) === today}<b style="color:var(--terra)">Hoy</b>{/if}</div>
+					<div class="n"><span>{d.getDate()}</span>{#if key(d) === today}<b style="color:var(--accent)">Hoy</b>{/if}</div>
 					{#each items as it}
 						{#if it.kind === 'article'}
 							<a class="mini" href={`/dashboard/articulos?abrir=${it.id}`} style="text-decoration:none;color:inherit">

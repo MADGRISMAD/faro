@@ -33,7 +33,7 @@
 		<div class="panel"><p class="error" role="alert">{r.error || 'No pude analizar el sitio.'}</p></div>
 	{:else if r}
 		{#if !r.connected}
-			<a class="panel" href="/dashboard/conectar" style="display:block;margin-bottom:18px;text-decoration:none;color:inherit;box-shadow:var(--out),0 0 0 3px var(--terra)">
+			<a class="panel" href="/dashboard/conectar" style="display:block;margin-bottom:18px;text-decoration:none;color:inherit;box-shadow:var(--out),0 0 0 3px var(--accent)">
 				<b>Tu blog ya funciona, pero aún no está en tu sitio.</b>
 				<span class="muted"> Si abres {r.canonical_url}{r.blog_prefix} hoy verás un 404. Conéctalo en 2 minutos →</span>
 			</a>
