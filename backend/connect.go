@@ -55,6 +55,39 @@ func verifyBlog(ctx context.Context, canonical, prefix, siteID string) (bool, st
 	return true, ""
 }
 
+// autoVerify revisa solo los sitios que aún no están conectados: en cuanto el cliente publica su cambio, Faro lo detecta
+// sin que tenga que volver a apretar «Verificar». (ponytail: sondeo cada tick; si hay miles de sitios, repartir por lotes)
+func (a *App) autoVerify(ctx context.Context) error {
+	rows, e := a.DB.QueryContext(ctx, `SELECT id,canonical_url,blog_prefix FROM sites WHERE connected_at IS NULL AND research IS NOT NULL AND created_at>now()-interval '60 days' ORDER BY random() LIMIT 8`)
+	if e != nil {
+		return e
+	}
+	type pending struct{ id, canonical, prefix string }
+	var list []pending
+	for rows.Next() {
+		var p pending
+		if e = rows.Scan(&p.id, &p.canonical, &p.prefix); e != nil {
+			rows.Close()
+			return e
+		}
+		list = append(list, p)
+	}
+	rows.Close()
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second) // un sitio caído no debe atrasar al resto
+	defer cancel()
+	for _, p := range list {
+		if ctx.Err() != nil {
+			break
+		}
+		if ok, _ := verifyBlog(ctx, p.canonical, p.prefix, p.id); ok {
+			if _, e = a.DB.ExecContext(ctx, `UPDATE sites SET connected_at=now() WHERE id=$1 AND connected_at IS NULL`, p.id); e != nil {
+				return e
+			}
+		}
+	}
+	return nil
+}
+
 func (a *App) verifySite(w http.ResponseWriter, r *http.Request) {
 	_, t, ok := a.auth(w, r, true)
 	if !ok {

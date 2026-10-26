@@ -13,3 +13,10 @@ export async function hostedSite(domain:string,origin:string,fetchFn:typeof fetc
  const r=await fetchFn(`${BACKEND_BASE_URL}/public/domain/${encodeURIComponent(domain)}`);if(!r.ok) throw error(404,'Blog no encontrado');
  const site=await r.json();return {...site,canonical_url:origin,blog_prefix:`/p/${domain}`};
 }
+
+// Modo proxy sin cabeceras (Vercel, Netlify…): el dominio llega en la ruta (/x/<dominio>) y el blog se ve como en el dominio del cliente:
+// enlaces con su prefijo (/blog) y canonical del cliente. Es lo mismo que el modo por cabecera x-faro-domain.
+export async function proxiedSite(domain:string,fetchFn:typeof fetch){
+ const r=await fetchFn(`${BACKEND_BASE_URL}/public/domain/${encodeURIComponent(domain)}`);if(!r.ok) throw error(404,'Blog no encontrado');
+ return await r.json();
+}

@@ -216,6 +216,11 @@ func (a *App) Work(ctx context.Context) {
 			if e := a.autopilotTick(ctx); e != nil {
 				slog.Error("Autopiloto", "error", e)
 			}
+			go func() { // en segundo plano: no frena la cola de artículos
+				if e := a.autoVerify(ctx); e != nil {
+					slog.Error("Verificación de conexión", "error", e)
+				}
+			}()
 			lastAutopilot = time.Now()
 		}
 		j, e := a.claim(ctx)

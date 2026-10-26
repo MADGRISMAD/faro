@@ -267,3 +267,39 @@ func TestVerificarConexionDelBlog(t *testing.T) {
 		t.Fatalf("conectado: %s", got)
 	}
 }
+
+func TestAutoVerificaLaConexionSola(t *testing.T) {
+	allowPrivate = true
+	defer func() { allowPrivate = false }()
+	app := testApp(t)
+	srv := httptest.NewServer(app.Routes())
+	defer srv.Close()
+	cookie, csrf, _ := registerTest(t, srv)
+	_, res, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": "auto-" + token()[:8] + ".test"}, cookie, csrf, "")
+	siteID := res["site_id"].(string)
+	mux := http.NewServeMux()
+	connected := false
+	mux.HandleFunc("/blog", func(w http.ResponseWriter, r *http.Request) {
+		if !connected {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, `<meta name="faro-site" content="%s">`, siteID)
+	})
+	client := httptest.NewServer(mux)
+	defer client.Close()
+	app.DB.Exec(`UPDATE sites SET canonical_url=$1,research='{}'::jsonb WHERE id=$2`, client.URL, siteID)
+	app.DB.Exec(`UPDATE sites SET research=NULL WHERE id<>$1`, siteID) // la base de pruebas acumula sitios de otras corridas; autoVerify revisa solo unos cuantos
+	app.autoVerify(context.Background())
+	var at *string
+	app.DB.QueryRow(`SELECT connected_at::text FROM sites WHERE id=$1`, siteID).Scan(&at)
+	if at != nil {
+		t.Fatal("marcó conectado un sitio que responde 404")
+	}
+	connected = true // el cliente publica su cambio
+	app.autoVerify(context.Background())
+	app.DB.QueryRow(`SELECT connected_at::text FROM sites WHERE id=$1`, siteID).Scan(&at)
+	if at == nil {
+		t.Fatal("no detectó la conexión sola")
+	}
+}

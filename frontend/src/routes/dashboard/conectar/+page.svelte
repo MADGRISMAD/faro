@@ -5,7 +5,7 @@
 	let busy = false, result: { connected: boolean; reason: string } | null = null, copied = '', recipe = '';
 	const names: Record<string, string> = { wordpress: 'WordPress', wix: 'Wix', shopify: 'Shopify', squarespace: 'Squarespace', webflow: 'Webflow', vercel: 'Vercel', netlify: 'Netlify', cloudflare: 'Cloudflare', nginx: 'Nginx', apache: 'Apache', caddy: 'Caddy', other: '' };
 	// Plataformas donde no se puede enviar una ruta a otro servidor: ahí se usa el enlace o el widget.
-	const closed = ['wordpress', 'wix', 'shopify', 'squarespace', 'webflow', 'vercel', 'netlify'];
+	const closed = ['wordpress', 'wix', 'shopify', 'squarespace', 'webflow'];
 	$: r = $research;
 	$: platform = r?.research?.platform || 'other';
 	$: faro = (() => {
@@ -17,9 +17,11 @@
 		nginx: `# En el bloque server de tu dominio\nlocation ~ ^${path}(/|$) {\n    proxy_pass https://${faro};\n    proxy_ssl_server_name on;\n    proxy_set_header Host ${faro};\n    proxy_set_header x-faro-domain ${domain};\n}`,
 		caddy: `${domain} {\n    handle ${path}* {\n        reverse_proxy https://${faro} {\n            header_up Host ${faro}\n            header_up x-faro-domain ${domain}\n        }\n    }\n    # ...el resto de tu sitio\n}`,
 		cloudflare: `// Cloudflare → Workers → Crear Worker, pega esto y agrega la ruta ${domain}${path}*\nexport default {\n  fetch(request) {\n    const url = new URL(request.url);\n    url.hostname = '${faro}';\n    const req = new Request(url, request);\n    req.headers.set('x-faro-domain', '${domain}');\n    return fetch(req);\n  }\n}`,
+		nextjs: `// next.config.mjs (sitio en Vercel con Next.js). Después haz deploy.\nconst nextConfig = {\n  async rewrites() {\n    return [\n      { source: '${path}', destination: 'https://${faro}/x/${domain}' },\n      { source: '${path}/:path*', destination: 'https://${faro}/x/${domain}/:path*' }\n    ];\n  }\n};\nexport default nextConfig;`,
+		netlify: `# Archivo _redirects en la carpeta publicada de tu sitio (Netlify)\n${path}        https://${faro}/x/${domain}          200!\n${path}/*      https://${faro}/x/${domain}/:splat   200!`,
 		apache: `# Necesita mod_proxy, mod_proxy_http, mod_ssl y mod_headers\nSSLProxyEngine on\nProxyPreserveHost Off\nRequestHeader set x-faro-domain "${domain}"\nProxyPass ${path} https://${faro}${path}\nProxyPassReverse ${path} https://${faro}${path}`
 	} as Record<string, string>;
-	$: if (!recipe) recipe = ['nginx', 'caddy', 'cloudflare', 'apache'].includes(platform) ? platform : 'nginx';
+	$: if (!recipe) recipe = platform === 'vercel' ? 'nextjs' : ['nginx', 'caddy', 'cloudflare', 'apache', 'netlify'].includes(platform) ? platform : 'nginx';
 	$: widget = `<div id="faro-blog"></div>\n<script src="${typeof location === 'undefined' ? '' : location.origin}/api/embed/${$siteId}.js" defer><\/script>`;
 
 	async function copy(key: string, text: string) {
@@ -74,7 +76,7 @@
 			</p>
 		{/if}
 		<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-			{#each [['nginx', 'Nginx'], ['caddy', 'Caddy'], ['cloudflare', 'Cloudflare'], ['apache', 'Apache']] as [id, label]}
+			{#each [['nextjs', 'Next.js / Vercel'], ['netlify', 'Netlify'], ['nginx', 'Nginx'], ['caddy', 'Caddy'], ['cloudflare', 'Cloudflare'], ['apache', 'Apache']] as [id, label]}
 				<button class="btn small" class:secondary={recipe !== id} on:click={() => (recipe = id)}>{label}</button>
 			{/each}
 		</div>
