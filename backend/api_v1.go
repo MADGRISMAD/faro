@@ -98,7 +98,11 @@ func contentHTML(c Content) string {
 	p := func(tag, s string) { fmt.Fprintf(&b, "<%s>%s</%s>", tag, html.EscapeString(s), tag) }
 	p("p", c.Intro)
 	for _, s := range c.Sections {
-		p("h2", s.Heading)
+		if s.Level == 3 {
+			p("h3", s.Heading)
+		} else {
+			p("h2", s.Heading)
+		}
 		for _, x := range s.Paragraphs {
 			p("p", x)
 		}

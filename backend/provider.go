@@ -25,6 +25,7 @@ type Content struct {
 }
 type Section struct {
 	Heading    string   `json:"heading"`
+	Level      int      `json:"level,omitempty"` // 3 = subtítulo dentro del apartado anterior; vacío = apartado normal (h2)
 	Paragraphs []string `json:"paragraphs"`
 	Bullets    []string `json:"bullets"`
 }
@@ -126,6 +127,9 @@ func sanitize(c Content) (Content, error) {
 			return c, fmt.Errorf("Contenido extenso")
 		}
 		s.Heading = clean(s.Heading, 180)
+		if s.Level != 3 {
+			s.Level = 0
+		}
 		for j := range s.Paragraphs {
 			s.Paragraphs[j] = clean(s.Paragraphs[j], 3000)
 		}
