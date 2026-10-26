@@ -12,7 +12,7 @@ test('la portada tiene «Iniciar sesión» que lleva al acceso y, con sesión ab
 	await page.evaluate(async () => { await fetch('/api/auth/logout', { method: 'POST', headers: { 'content-type': 'application/json', 'x-csrf-token': localStorage.getItem('faro_csrf') || '' } }); localStorage.removeItem('faro_csrf'); });
 
 	await page.goto(`${panel}/`);
-	await expect(page.getByRole('heading', { name: 'Tu blog, escrito solo.' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Que te encuentren primero.' })).toBeVisible();
 	await expect(page.locator('header.top')).toBeVisible();
 	await page.screenshot({ path: '../screenshots/portada.png', fullPage: true });
 	await page.locator('header.top').getByRole('link', { name: 'Iniciar sesión' }).click();
