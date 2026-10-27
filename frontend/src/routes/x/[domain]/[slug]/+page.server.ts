@@ -1,7 +1,7 @@
 import { proxiedSite, publicFetch } from '#lib/public.server';
 import type { PageServerLoad } from './$types';
-export const load: PageServerLoad = async ({ fetch, params }) => {
+export const load: PageServerLoad = async ({ url, fetch, params }) => {
 	const site = await proxiedSite(params.domain, fetch);
 	const article = await publicFetch(`/public/sites/${site.id}/articles/${encodeURIComponent(params.slug)}`, fetch);
-	return { site, article };
+	return { site, article, base: process.env.PUBLIC_BASE_URL || url.origin };
 };
