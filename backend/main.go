@@ -78,13 +78,13 @@ func config() (Config, error) {
 		return Config{}, errors.New("GEMINI_MAX_OUTPUT_TOKENS inválido")
 	}
 	model := env("GEMINI_MODEL", "mock")
-	img := env("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-lite-image") // el más barato de Nano Banana
+	img := env("GEMINI_IMAGE_MODEL", "gemini-3.1-flash-image") // Nano Banana 2: mejor detalle y respeto de la paleta que la versión Lite
 	if model == "mock" {
 		img = "mock"
 	} else if img == "off" {
 		img = ""
 	}
-	imgRate, e := parseRate(env("GEMINI_IMAGE_USD_PER_MILLION", "30.0"))
+	imgRate, e := parseRate(env("GEMINI_IMAGE_USD_PER_MILLION", "60.0")) // tarifa de Nano Banana 2 (US$0.067 por imagen de 1K)
 	if e != nil {
 		return Config{}, e
 	}
@@ -171,6 +171,13 @@ func migrate(db *sql.DB) error {
 		return e
 	}
 	b, readErr = migrations.ReadFile("migrations/20261101000000_review.sql")
+	if readErr != nil {
+		return readErr
+	}
+	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
+		return e
+	}
+	b, readErr = migrations.ReadFile("migrations/20261102000000_memphis.sql")
 	if readErr != nil {
 		return readErr
 	}

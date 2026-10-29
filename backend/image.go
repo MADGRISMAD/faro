@@ -22,13 +22,17 @@ import (
 	"time"
 )
 
-const imageReserve = 60000 // US$0.06 por imagen: margen sobre los ~US$0.034 que cuesta una de 1K
+const imageReserve = 150000 // US$0.15 por imagen: una de 1K con Nano Banana 2 son ~1,100 tokens de imagen más ~400 de razonamiento (US$0.09 a tarifa de imagen)
 
-type ImagePrompt struct{ Title, Business, Audience, Tone, Style, Notes string }
+type ImagePrompt struct {
+	Title, Business, Audience, Tone, Style, Notes string
+	Palette                                       []string // colores de la marca (hex); vacío = paleta sobria libre
+}
 
 // Estilos que el cliente puede elegir en Brand DNA. Cada uno describe técnica, luz y textura, no solo un adjetivo:
 // así dos portadas del mismo sitio se ven de la misma serie. Las muestras del selector (static/estilos/) salieron de aquí.
 var imageStyles = map[string]string{
+	"memphis":    "ilustración vectorial plana estilo Memphis corporativo: el sujeto en formas limpias con contornos finos y uniformes, rodeado de pocas figuras geométricas decorativas (círculos, medios círculos, triángulos, zigzags, líneas onduladas y retículas de puntos) bien ordenadas en los bordes; colores sólidos sin degradados, sin texturas ni sombras realistas, mucho espacio libre y un acabado pulido de marca tecnológica, nunca infantil ni recargado",
 	"clean":      "ilustración editorial vectorial plana, formas geométricas limpias, sombras planas suaves y un grano fino sutil, como la portada de una revista de negocios moderna",
 	"photo":      "fotografía editorial realista, luz natural lateral suave, poca profundidad de campo (lente de 35 mm), colores naturales; si aparecen personas, de espaldas, de perfil o solo sus manos, nunca rostros de frente",
 	"watercolor": "pintura en acuarela sobre papel de grano grueso, manchas que se difuminan en los bordes, contornos finos de tinta y mucho blanco del papel",
@@ -47,7 +51,11 @@ type ImageResult struct {
 func imageText(p ImagePrompt) string {
 	style, ok := imageStyles[p.Style]
 	if !ok {
-		style = imageStyles["clean"]
+		style = imageStyles["memphis"]
+	}
+	colors := "\nColores: una paleta sobria y armónica de 3 o 4 tonos, más blanco."
+	if len(p.Palette) > 0 {
+		colors = "\nColores (obligatorio): usa únicamente los colores de la marca " + strings.Join(p.Palette, ", ") + ", sus tonos más claros, blanco y un gris muy oscuro para contornos. Ningún otro color: nada de azules, verdes, amarillos ni otros tonos que no estén en esa lista."
 	}
 	notes := ""
 	if n := strings.TrimSpace(p.Notes); n != "" {
@@ -58,10 +66,10 @@ Tema del artículo (solo para saber qué mostrar; NO lo escribas en la imagen): 
 Negocio: %s. Lectores: %s.
 Qué mostrar: una escena concreta que los lectores reconozcan de su día a día con este tema: el objeto, el lugar o el momento real del que trata (por ejemplo el mostrador de una tienda, unas manos cobrando con una terminal, la cocina de un restaurante), no ideas abstractas. Un solo sujeto principal que se entienda a primera vista, con detalles que lo hagan propio de México cuando aplique. Si el tema compara dos opciones, muéstralas lado a lado solo con objetos.
 Composición: sujeto un poco fuera del centro, fondo sencillo y aire alrededor para que se pueda recortar a cuadrado sin perder lo importante; profundidad entre primer plano y fondo.
-Estilo: %s.
-Color: paleta limitada de 3 o 4 tonos armónicos con un color de acento y buena separación entre sujeto y fondo.
+Estilo: %s.%s
+Contraste: buena separación entre el sujeto y el fondo.
 Evita: personas sonriendo a la cámara, apretones de manos, gente señalando pantallas, hologramas, cerebros o robots genéricos de «inteligencia artificial», engranes, focos, flechas de crecimiento, gráficas de adorno, monedas flotando y oficinas genéricas.%s
-Prohibido absolutamente: texto, letras, palabras, números, logotipos, marcas de agua, letreros y pantallas con texto legible.`, p.Title, p.Business, p.Audience, style, notes)
+Prohibido absolutamente: texto, letras, palabras, números, logotipos, marcas comerciales reales, marcas de agua, letreros y pantallas con texto legible. Los productos, empaques, latas y botellas van lisos o con formas simples, sin nombres ni etiquetas que se lean.`, p.Title, p.Business, p.Audience, style, colors, notes)
 }
 
 func (*Mock) Image(_ context.Context, _ ImagePrompt, _ Config) ImageResult {
@@ -157,6 +165,7 @@ func (a *App) runImage(ctx context.Context, j *WorkItem) {
 	defer cancel()
 	ip := ImagePrompt{Title: j.Prompt.Topic, Business: j.Prompt.Business, Audience: j.Prompt.Audience, Tone: j.Prompt.Tone}
 	_ = a.DB.QueryRowContext(ctx, `SELECT image_style,image_notes FROM sites WHERE id=$1`, j.Site).Scan(&ip.Style, &ip.Notes)
+	ip.Palette = a.sitePalette(callCtx, j.Site)
 	r := a.Provider.Image(callCtx, ip, a.Config)
 	var jpg []byte
 	if r.Err == nil {

@@ -6,7 +6,7 @@
 	const steps = ['Tu negocio', 'Tu público', 'Tu voz', 'Imágenes', 'Temas', 'Ritmo'];
 	let step = 0, busy = false, error = '', ready = false;
 	let business = '', themes: string[] = [], newTheme = '', audience = '', location = '', tone = '', avoid = '';
-	let images = true, style = 'clean', notes = '';
+	let images = true, style = 'memphis', notes = '';
 	let dropped: Record<string, boolean> = {};
 	let perWeek = 2, autopilot = true, autoPublish = true;
 
@@ -22,7 +22,7 @@
 		tone = p.tone;
 		avoid = $research?.avoid_topics || '';
 		images = $research?.images_enabled ?? true;
-		style = $research?.image_style || 'clean';
+		style = $research?.image_style || 'memphis';
 		notes = $research?.image_notes || '';
 		perWeek = $research?.posts_per_week || 2;
 		autoPublish = !sensitive;

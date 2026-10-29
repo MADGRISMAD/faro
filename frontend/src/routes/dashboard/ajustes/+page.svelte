@@ -74,9 +74,9 @@
 
 	<section class="panel" style="margin-bottom:18px">
 		<h2 style="font-size:1.25rem;margin:0 0 4px">Ritmo de publicación</h2>
-		<p class="muted" style="margin-top:0">Las primeras dos semanas sale 1 por semana y nunca más de 3: un ritmo constante y moderado le sienta mejor a Google que publicar mucho de golpe.</p>
+		<p class="muted" style="margin-top:0">Un blog nuevo empieza con 1 por semana durante dos semanas; si ya tiene 5 o más artículos publicados, arranca directo. Nunca más de 5 por semana: un ritmo constante y moderado le sienta mejor a Google que publicar mucho de golpe.</p>
 		<div style="display:flex;gap:10px">
-			{#each [1, 2, 3] as n}<button class="btn small" class:secondary={$research?.posts_per_week !== n} on:click={() => perWeek(n)}>{n} por semana</button>{/each}
+			{#each [1, 2, 3, 5] as n}<button class="btn small" class:secondary={$research?.posts_per_week !== n} on:click={() => perWeek(n)}>{n} por semana</button>{/each}
 		</div>
 		{#if saved}<p class="success" role="status" style="margin:14px 0 0">{saved}</p>{/if}
 	</section>

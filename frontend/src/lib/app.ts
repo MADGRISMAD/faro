@@ -90,6 +90,7 @@ export function stopPolling() {
 export const statusName: Record<string, string> = { draft: 'Borrador', approved: 'Aprobado', published: 'Publicado' };
 export const intentName: Record<string, string> = { informational: 'Informativo', comparison: 'Comparación', purchase: 'Compra', local: 'Local' };
 export const imageStyles: { id: string; name: string; hint: string }[] = [
+	{ id: 'memphis', name: 'Memphis corporativo', hint: 'Formas geométricas planas con los colores de tu sitio' },
 	{ id: 'clean', name: 'Limpio y minimalista', hint: 'Ilustración plana, como de revista' },
 	{ id: 'photo', name: 'Fotorrealista', hint: 'Fotografía editorial con luz natural' },
 	{ id: 'watercolor', name: 'Acuarela', hint: 'Pintura suave sobre papel' },

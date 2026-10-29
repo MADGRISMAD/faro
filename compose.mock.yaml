@@ -4,6 +4,7 @@ services:
   backend:
     environment:
       FACEBOOK_MODE: mock
+      REGISTER_PER_HOUR: "50"
       TOKEN_ENCRYPTION_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
   worker:
     environment:

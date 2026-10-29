@@ -490,8 +490,8 @@ func enqueueTopic(ctx context.Context, tx *sql.Tx, tenant, site string, p Profil
 // autopilotTick: por cada sitio con autopiloto, mantiene el ritmo semanal con el siguiente tema sin usar.
 func (a *App) autopilotTick(ctx context.Context) error {
 	rows, e := a.DB.QueryContext(ctx, `SELECT s.id,s.tenant_id,s.posts_per_week,s.research FROM sites s WHERE s.autopilot AND s.research IS NOT NULL AND s.brand_confirmed_at IS NOT NULL AND
-		(SELECT count(*) FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND j.created_at>now()-interval '7 days')<LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' THEN 1 ELSE 3 END) AND
-		NOT EXISTS(SELECT 1 FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND (j.status IN ('queued','running') OR j.created_at>now()-make_interval(hours => 168/LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' THEN 1 ELSE 3 END))))`)
+		(SELECT count(*) FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND j.created_at>now()-interval '7 days')<LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' AND (SELECT count(*) FROM articles x WHERE x.site_id=s.id AND x.status='published')<5 THEN 1 ELSE 5 END) AND
+		NOT EXISTS(SELECT 1 FROM jobs j WHERE j.site_id=s.id AND j.kind='article' AND (j.status IN ('queued','running') OR j.created_at>now()-make_interval(hours => 168/LEAST(s.posts_per_week,CASE WHEN s.created_at>now()-interval '14 days' AND (SELECT count(*) FROM articles x WHERE x.site_id=s.id AND x.status='published')<5 THEN 1 ELSE 5 END))))`)
 	if e != nil {
 		return e
 	}
@@ -673,8 +673,9 @@ func (a *App) siteResearch(w http.ResponseWriter, r *http.Request) {
 		out["research"] = json.RawMessage(blob)
 	}
 	// ritmo real: las dos primeras semanas el autopiloto publica 1 por semana aunque el cliente haya elegido más
-	out["effective_per_week"] = effectivePerWeek(created, perWeek)
-	if end := created.Add(rampUp); end.After(time.Now()) {
+	est := a.established(r.Context(), site)
+	out["effective_per_week"] = effectivePerWeek(created, perWeek, est)
+	if end := created.Add(rampUp); !est && end.After(time.Now()) {
 		out["ramp_until"] = end
 	}
 	// avance de los artículos que arrancó el autopiloto
@@ -700,7 +701,7 @@ func (a *App) setAutopilot(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &x) {
 		return
 	}
-	if x.PostsPerWeek < 1 || x.PostsPerWeek > 3 { // más que esto en un sitio normal parece contenido masivo
+	if x.PostsPerWeek < 1 || x.PostsPerWeek > maxPerWeek { // más que esto en un sitio normal parece contenido masivo
 		x.PostsPerWeek = 2
 	}
 	res, e := a.DB.ExecContext(r.Context(), `UPDATE sites SET autopilot=$1,posts_per_week=$2 WHERE id=$3 AND tenant_id=$4`, x.Enabled, x.PostsPerWeek, site, t)
@@ -850,16 +851,29 @@ func (a *App) patchBrand(w http.ResponseWriter, r *http.Request) {
 
 const rampUp = 14 * 24 * time.Hour // arranque prudente: Google ve crecer el blog poco a poco
 
-func effectivePerWeek(created time.Time, perWeek int) int {
-	return perWeekAt(created, perWeek, time.Now())
+// Un blog con historia (5 o más artículos publicados, p. ej. importados) no necesita el arranque lento.
+const establishedPosts = 5
+
+// Máximo de artículos por semana: constante y moderado, sin llegar a contenido masivo.
+const maxPerWeek = 5
+
+func effectivePerWeek(created time.Time, perWeek int, established bool) int {
+	return perWeekAt(created, perWeek, established, time.Now())
 }
 
 // perWeekAt: el ritmo que aplica en una fecha dada (el calendario lo usa para fechas futuras, ya pasado el arranque).
-func perWeekAt(created time.Time, perWeek int, at time.Time) int {
-	if at.Before(created.Add(rampUp)) {
+func perWeekAt(created time.Time, perWeek int, established bool, at time.Time) int {
+	if !established && at.Before(created.Add(rampUp)) {
 		return 1
 	}
-	return max(1, min(perWeek, 3))
+	return max(1, min(perWeek, maxPerWeek))
+}
+
+// established: el sitio ya tiene suficientes artículos publicados como para saltarse el arranque.
+func (a *App) established(ctx context.Context, site string) bool {
+	var n int
+	_ = a.DB.QueryRowContext(ctx, `SELECT count(*) FROM articles WHERE site_id=$1 AND status='published'`, site).Scan(&n)
+	return n >= establishedPosts
 }
 
 func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
@@ -926,8 +940,9 @@ func (a *App) siteCalendar(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(blob, &p)
 		var last time.Time
 		_ = a.DB.QueryRowContext(r.Context(), `SELECT COALESCE(max(created_at),now()) FROM jobs WHERE site_id=$1 AND kind='article'`, site).Scan(&last)
+		est := a.established(r.Context(), site)
 		step := func(at time.Time) time.Duration {
-			return time.Duration(168/perWeekAt(created, perWeek, at)) * time.Hour
+			return time.Duration(168/perWeekAt(created, perWeek, est, at)) * time.Hour
 		}
 		next := last.Add(step(last))
 		if next.Before(time.Now()) {

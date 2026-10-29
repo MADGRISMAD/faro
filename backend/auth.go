@@ -11,6 +11,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -135,7 +137,12 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 		fail(w, 403, "Origen no permitido")
 		return
 	}
-	if !a.Limiter.Allow("register:"+clientIP(r), 5, time.Hour) {
+	// 5 cuentas por hora por IP; el entorno de pruebas lo sube (REGISTER_PER_HOUR) porque la suite e2e crea varias seguidas
+	perHour, e := strconv.Atoi(os.Getenv("REGISTER_PER_HOUR"))
+	if e != nil || perHour < 1 {
+		perHour = 5
+	}
+	if !a.Limiter.Allow("register:"+clientIP(r), perHour, time.Hour) {
 		fail(w, 429, "Demasiados intentos. Intenta más tarde.")
 		return
 	}
