@@ -20,6 +20,10 @@ func TestReviewFlagsWhatCannotBeBacked(t *testing.T) {
 	if strings.Contains(notes, "$499") {
 		t.Error("$499 está en los datos del negocio: no es una cifra sin fuente")
 	}
+	sinAcentos := Generated{Title: "Mejor software para consultorios medicos en Mexico", Content: Content{Intro: strings.Repeat("El software para consultorios medicos ayuda a la clinica con la informacion. ", 20)}}
+	if n := strings.Join(review(sinAcentos, ""), " "); !strings.Contains(n, "no tiene acentos") {
+		t.Errorf("texto sin acentos no marcado: %s", n)
+	}
 	if n := review(Generated{Title: "Cómo ordenar tu inventario", Content: Content{Intro: "Empieza por contar lo que tienes."}}, ""); len(n) != 0 {
 		t.Errorf("texto limpio marcado: %v", n)
 	}
@@ -52,7 +56,7 @@ func TestCleanDropsInvisibleCharacters(t *testing.T) {
 
 func TestWriterPromptCarriesTheRules(t *testing.T) {
 	p := writerPrompt(Prompt{Topic: "Expediente clínico", Brand: "Caresia: agenda y expediente.", Name: "Caresia", Location: "Tijuana", Sensitive: true})
-	for _, want := range []string{"Expediente clínico", "Caresia: agenda y expediente.", "Tijuana", "No inventes cifras", "40 a 60 caracteres", "120 a 155", "cuándo NO conviene", "no sustituye la orientación de un profesional"} {
+	for _, want := range []string{"Expediente clínico", "Caresia: agenda y expediente.", "Tijuana", "No inventes cifras", "acentos, ñ, ¿ y ¡", "40 a 60 caracteres", "120 a 155", "cuándo NO conviene", "no sustituye la orientación de un profesional"} {
 		if !strings.Contains(p, want) {
 			t.Errorf("falta %q", want)
 		}

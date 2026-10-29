@@ -35,6 +35,10 @@ Datos y afirmaciones:
 - Nada de garantías ni absolutos: no uses «garantiza», «100 %», «sin riesgo», «el mejor», «absoluto», «siempre funciona».
 - No incluyas HTML, Markdown ni enlaces.
 
+Ortografía:
+- Español con ortografía completa: acentos, ñ, ¿ y ¡ en todo el texto, también en title, meta_description y headings.
+- El tema y la palabra clave pueden venir sin acentos porque así los escribe la gente al buscar: en el artículo escríbelos correctamente acentuados («médicos», «México»).
+
 Estilo:
 - Concreto y práctico: ejemplos de la vida diaria del público, pasos que se puedan seguir.
 - Evita frases de relleno típicas de textos generados: «en el mundo actual», «en la era digital», «hoy más que nunca», «es crucial», «sin lugar a dudas», «llevar tu negocio al siguiente nivel», «solución integral», «potenciar», «en conclusión», «en resumen», «descubre cómo», «sumérgete».
@@ -58,6 +62,7 @@ var (
 	timesRe   = regexp.MustCompile(`(?i)\b\d+(?:[.,]\d+)?\s+veces\b`)
 	moneyRe   = regexp.MustCompile(`\$\s?\d[\d.,]*`)
 	promiseRe = regexp.MustCompile(`(?i)\b(garantiz\p{L}*|sin (?:ningún )?riesgo|resultados inmediatos|absolut\p{L}*|número uno|el mejor del mercado|la mejor del mercado)\b`)
+	accentRe  = regexp.MustCompile(`[áéíóúüñÁÉÍÓÚÜÑ¿¡]`)
 	studyRe   = regexp.MustCompile(`(?i)\b(según (?:un |los |diversos |varios )?estudios?|estudios (?:demuestran|indican|revelan)|investigaciones (?:demuestran|indican)|una encuesta de)\b`)
 )
 
@@ -85,6 +90,10 @@ func review(g Generated, facts string) []string {
 	}
 	for _, m := range studyRe.FindAllString(text, -1) {
 		add("Menciona «" + m + "» sin decir cuál. Cita la fuente o quítalo.")
+	}
+	// un texto largo en español sin un solo acento salió mal escrito (pasa cuando el tema llega sin acentos)
+	if len(strings.Fields(text)) > 150 && !accentRe.MatchString(text) {
+		add("El texto no tiene acentos ni signos de apertura. Corrige la ortografía o vuelve a generarlo.")
 	}
 	return notes
 }
