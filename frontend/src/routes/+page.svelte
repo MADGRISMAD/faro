@@ -277,7 +277,7 @@
 
 		<footer class="foot">
 			<a class="brand" href="/"><span class="logo-tile s">{@render faro()}</span><span class="wordmark s">Faro<small>by Hyperion</small></span></a>
-			<span>© 2026 Hyperion Software · Tijuana, México</span>
+			<span>© 2026 <a href="https://www.hyperionmkt.com/">Hyperion Software</a> · Tijuana, México</span>
 			<nav aria-label="Legal"><a href="https://www.hyperionmkt.com/faro/privacidad">Privacidad</a><a href="https://www.hyperionmkt.com/faro/terminos">Condiciones</a></nav>
 		</footer>
 	</div>
@@ -471,7 +471,7 @@
 	.final .h2{font-size:clamp(2rem,3.7vw,3rem)}.final .h2 span{color:var(--crimson)}
 	.final .lead2{margin-top:18px}.final .ctas{margin-top:22px;gap:16px}
 	.foot{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-top:96px;padding:0 0 20px;font-size:15px;font-weight:700;color:#4a3a4e}
-	.foot nav{display:flex;gap:22px}.foot nav a{text-decoration:underline}
+	.foot nav{display:flex;gap:22px}.foot nav a,.foot span a{color:inherit;text-decoration:underline}
 
 	/* celular y tableta */
 	@media(max-width:1100px){
