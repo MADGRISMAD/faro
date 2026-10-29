@@ -230,7 +230,8 @@ func TestAutopilotNoPublicaSensibleNiFlaco(t *testing.T) {
 	_, res, _ := request(t, srv, "POST", "/sites/analyze", map[string]string{"url": "clinica-" + token()[:8] + ".test"}, cookie, csrf, "")
 	siteID := res["site_id"].(string)
 	app.DB.Exec(`UPDATE jobs SET status='failed' WHERE site_id=$1 AND kind='research'`, siteID) // la investigación no es lo que se prueba aquí
-	run := func(_ int) string {                                                                 // escribe un artículo del sitio y devuelve su estado
+	inventa := false
+	run := func(_ int) string { // escribe un artículo del sitio y devuelve su estado
 		var id string
 		app.DB.QueryRow(`INSERT INTO jobs(tenant_id,site_id,idempotency_key,topic,business,audience,kind) VALUES($1,$2,$3,'Tema','Negocio','Público','article') RETURNING id`, tenant, siteID, token()).Scan(&id)
 		var j *WorkItem
@@ -243,7 +244,11 @@ func TestAutopilotNoPublicaSensibleNiFlaco(t *testing.T) {
 		if j == nil || j.ID != id {
 			t.Fatal("no se pudo tomar el job")
 		}
-		if e := app.finish(context.Background(), j, app.Provider.Create(context.Background(), j.Prompt, app.Config)); e != nil {
+		res := app.Provider.Create(context.Background(), j.Prompt, app.Config)
+		if inventa {
+			res.Article.Content.Intro += " Reduce hasta un 70% el trabajo."
+		}
+		if e := app.finish(context.Background(), j, res); e != nil {
 			t.Fatal(e)
 		}
 		var st string
@@ -257,6 +262,29 @@ func TestAutopilotNoPublicaSensibleNiFlaco(t *testing.T) {
 	minAutoWords = 0
 	if st := run(0); st != "published" {
 		t.Fatalf("artículo normal: %s", st)
+	}
+	// una cifra que no viene del negocio: aunque el sitio publique solo, queda en borrador con la nota
+	inventa = true
+	if st := run(0); st != "draft" {
+		t.Fatalf("cifra sin fuente: %s", st)
+	}
+	inventa = false
+	var notes string
+	app.DB.QueryRow(`SELECT review_notes::text FROM articles WHERE site_id=$1 ORDER BY created_at DESC LIMIT 1`, siteID).Scan(&notes)
+	if !strings.Contains(notes, "70%") {
+		t.Fatalf("notas: %s", notes)
+	}
+	// mismo título: dirección corta y, si ya existe, -2, -3…
+	rows, _ := app.DB.Query(`SELECT slug FROM articles WHERE site_id=$1 ORDER BY created_at`, siteID)
+	slugs := []string{}
+	for rows.Next() {
+		var sl string
+		rows.Scan(&sl)
+		slugs = append(slugs, sl)
+	}
+	rows.Close()
+	if len(slugs) != 3 || slugs[0] != "guia-tema-publico" || slugs[1] != "guia-tema-publico-2" || slugs[2] != "guia-tema-publico-3" {
+		t.Fatalf("slugs: %v", slugs)
 	}
 	app.DB.Exec(`UPDATE sites SET auto_publish=false WHERE id=$1`, siteID) // sector sensible
 	if st := run(0); st != "draft" {

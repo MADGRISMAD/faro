@@ -89,6 +89,13 @@
 	{#if selected}
 		<section class="panel" style="margin-bottom:24px">
 			<div class="row"><h2 style="margin:0;font-size:1.4rem">{selected.title}</h2><button class="btn secondary small" on:click={() => (selected = null)}>Cerrar</button></div>
+			{#if Array.isArray(selected.review_notes) && selected.review_notes.length}
+				<div class="review" role="note" style="margin-top:16px">
+					<b>Revisa esto antes de publicar</b>
+					<ul>{#each selected.review_notes as n}<li>{n}</li>{/each}</ul>
+					<p class="small" style="margin:8px 0 0">Faro no publica solo un artículo con estas notas. Al guardar tus cambios se vuelve a revisar.</p>
+				</div>
+			{/if}
 			{#if selected.has_image}<img class="thumb" style="margin:16px 0" src={`/api/articles/${selected.id}/image`} alt="Portada del artículo" />{/if}
 			<div class="stack" style="margin-top:12px">
 				<label>Título<input bind:value={selected.title} disabled={lock()} /></label>
@@ -120,7 +127,7 @@
 		{#each $articles as a}
 			<button class="post" style="text-align:left;cursor:pointer;font:inherit" on:click={() => open(a.id)}>
 				{#if a.has_image}<img class="thumb" src={`/api/articles/${a.id}/image`} alt="" loading="lazy" />{:else}<div class="thumb empty">Sin imagen</div>{/if}
-				<div><h3>{a.title}</h3><p>{a.summary}</p><p style="margin-top:8px"><span class="chip {a.status}">{statusName[a.status]}</span> <span class="muted small">{a.published_at ? new Date(a.published_at).toLocaleDateString('es-MX', { dateStyle: 'medium' }) : ''}</span></p></div>
+				<div><h3>{a.title}</h3><p>{a.summary}</p><p style="margin-top:8px"><span class="chip {a.status}">{statusName[a.status]}</span>{#if typeof a.review_notes === 'number' && a.review_notes > 0} <span class="chip review">Por revisar</span>{/if} <span class="muted small">{a.published_at ? new Date(a.published_at).toLocaleDateString('es-MX', { dateStyle: 'medium' }) : ''}</span></p></div>
 			</button>
 		{:else}
 			<div class="panel"><p class="muted" style="margin:0">Aún no hay artículos.</p></div>

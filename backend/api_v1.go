@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -124,13 +125,44 @@ func contentHTML(c Content) string {
 	return b.String()
 }
 
+// origin: «https://www.x.com/algo» → «https://www.x.com»
+func origin(u string) string {
+	if p, e := url.Parse(u); e == nil && p.Scheme != "" && p.Host != "" {
+		return p.Scheme + "://" + p.Host
+	}
+	return strings.TrimRight(u, "/")
+}
+
+// relatedHTML: «Sigue leyendo» con los artículos más recientes del mismo blog (enlaces internos con su título como texto)
+func relatedHTML(rel []map[string]string) string {
+	if len(rel) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("<h2>Sigue leyendo</h2><ul>")
+	for _, r := range rel {
+		fmt.Fprintf(&b, `<li><a href="%s">%s</a></li>`, html.EscapeString(r["path"]), html.EscapeString(r["title"]))
+	}
+	b.WriteString("</ul>")
+	return b.String()
+}
+
 func jsonLD(s v1Site, title, meta, slug string, at time.Time, img bool, c Content) []any {
-	url := strings.TrimRight(s.Canonical, "/") + s.Prefix + "/" + slug
-	post := map[string]any{"@context": "https://schema.org", "@type": "BlogPosting", "headline": title, "description": meta, "datePublished": at, "dateModified": at, "mainEntityOfPage": url, "publisher": map[string]any{"@type": "Organization", "name": s.Name}}
+	home := origin(s.Canonical)
+	blog := strings.TrimRight(s.Canonical, "/") + s.Prefix
+	link := blog + "/" + slug
+	// el negocio es editor y autor: una sola entidad con @id, la misma que el sitio puede declarar en su portada
+	org := map[string]any{"@type": "Organization", "@id": home + "/#organization", "name": s.Name, "url": home}
+	post := map[string]any{"@context": "https://schema.org", "@type": "BlogPosting", "@id": link + "#article", "headline": title, "description": meta, "datePublished": at, "dateModified": at, "inLanguage": "es-MX", "mainEntityOfPage": link, "url": link, "publisher": org, "author": org}
 	if img {
 		post["image"] = imageURL(s, slug)
 	}
-	out := []any{post}
+	crumbs := map[string]any{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": []any{
+		map[string]any{"@type": "ListItem", "position": 1, "name": "Inicio", "item": home},
+		map[string]any{"@type": "ListItem", "position": 2, "name": "Blog", "item": blog},
+		map[string]any{"@type": "ListItem", "position": 3, "name": title, "item": link},
+	}}
+	out := []any{post, crumbs}
 	if len(c.FAQ) > 0 {
 		qs := []any{}
 		for _, f := range c.FAQ {
@@ -169,13 +201,24 @@ func (a *App) v1Post(w http.ResponseWriter, r *http.Request) {
 		dbError(w, errors.New("contenido corrupto"))
 		return
 	}
+	related := []map[string]string{}
+	if rows, e := a.DB.QueryContext(r.Context(), `SELECT slug,title FROM articles WHERE site_id=$1 AND status='published' AND id<>$2 ORDER BY published_at DESC LIMIT 3`, s.ID, id); e == nil {
+		for rows.Next() {
+			var rs, rt string
+			if rows.Scan(&rs, &rt) == nil {
+				related = append(related, map[string]string{"title": rt, "path": s.Prefix + "/" + rs})
+			}
+		}
+		rows.Close()
+	}
 	v1Headers(w)
 	jsonResponse(w, 200, map[string]any{
-		"id": id, "site_id": s.ID, "slug": slug, "title": title, "summary": summary, "published_at": at, "reading_minutes": readingMinutes(c),
+		"related": related,
+		"id":      id, "site_id": s.ID, "slug": slug, "title": title, "summary": summary, "published_at": at, "reading_minutes": readingMinutes(c),
 		"path": s.Prefix + "/" + slug, "canonical": strings.TrimRight(s.Canonical, "/") + s.Prefix + "/" + slug,
 		"image":   v1Image(s, slug, title, img),
 		"seo":     map[string]any{"title": title + " | " + s.Name, "description": meta},
-		"content": c, "html": contentHTML(c), "jsonld": jsonLD(s, title, meta, slug, at, img, c),
+		"content": c, "html": contentHTML(c) + relatedHTML(related), "jsonld": jsonLD(s, title, meta, slug, at, img, c),
 	})
 }
 

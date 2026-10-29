@@ -62,7 +62,7 @@ func TestAPIv1EntregaSoloDatos(t *testing.T) {
 	}
 	code, post, _ := request(t, srv, "GET", "/v1/"+domain+"/posts/"+slug, nil, "", "", "")
 	ld := post["jsonld"].([]any)
-	if code != 200 || len(ld) != 2 || ld[0].(map[string]any)["@type"] != "BlogPosting" || ld[1].(map[string]any)["@type"] != "FAQPage" {
+	if code != 200 || len(ld) != 3 || ld[0].(map[string]any)["@type"] != "BlogPosting" || ld[1].(map[string]any)["@type"] != "BreadcrumbList" || ld[2].(map[string]any)["@type"] != "FAQPage" {
 		t.Fatalf("artículo: %d %#v", code, post["jsonld"])
 	}
 	// una dirección anterior sigue resolviendo y responde con la dirección actual

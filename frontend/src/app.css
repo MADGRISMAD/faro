@@ -39,6 +39,7 @@ textarea{min-height:110px;resize:vertical}
 .btn:disabled{opacity:.55;cursor:wait}
 .error{color:#a30b45;background:var(--accent-xl);padding:13px 16px;border-radius:18px;box-shadow:var(--in-s)}
 .success{color:#0f4d2a;background:#d6f5e3;padding:13px 16px;border-radius:18px;box-shadow:var(--in-s)}
+.review{color:#5c3a00;background:#fff3d6;padding:13px 16px;border-radius:18px;box-shadow:var(--in-s)}.review ul{margin:8px 0 0;padding-left:20px}
 .pill{display:inline-block;padding:5px 12px;border-radius:20px;background:var(--accent-xl);font-size:.78rem;font-weight:800;box-shadow:var(--out-s)}
 .panel-title{display:flex;justify-content:space-between;gap:20px;align-items:center}
 .article-list{list-style:none;padding:0}.article-list li{padding:18px 0}.article-list a{font-weight:800;text-decoration:none}
@@ -77,7 +78,7 @@ textarea{min-height:110px;resize:vertical}
 .thumb{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:22px;background:var(--well);box-shadow:var(--out-s);display:block}
 .thumb.empty{display:grid;place-items:center;color:#b78aa0;font-size:.8rem;text-align:center;padding:10px;box-shadow:var(--in-s)}
 .chip{display:inline-block;font-size:.72rem;font-weight:800;padding:4px 11px;border-radius:99px;background:var(--accent-xl);color:var(--accent-d);box-shadow:var(--out-s)}
-.chip.published{background:var(--ink);color:var(--surface)}.chip.draft{background:var(--well);color:var(--ink)}.chip.approved{background:var(--accent-xl);color:var(--accent-d)}.chip.plan{background:var(--surface);color:var(--mut);box-shadow:var(--in-s)}
+.chip.published{background:var(--ink);color:var(--surface)}.chip.draft{background:var(--well);color:var(--ink)}.chip.approved{background:var(--accent-xl);color:var(--accent-d)}.chip.plan{background:var(--surface);color:var(--mut);box-shadow:var(--in-s)}.chip.review{background:#fff3d6;color:#5c3a00}
 .dayline{display:flex;align-items:center;gap:14px;color:var(--mut);font-size:.8rem;font-weight:700;margin:24px 0 12px}.dayline::before,.dayline::after{content:"";flex:1;height:4px;border-radius:4px;background:var(--well);box-shadow:var(--in-s)}
 .feed{display:grid;gap:22px}
 .post{display:grid;grid-template-columns:210px 1fr;gap:20px;align-items:center;background:var(--surface);border:0;border-radius:28px;padding:16px;text-decoration:none;color:inherit;box-shadow:var(--out);transition:transform .12s}

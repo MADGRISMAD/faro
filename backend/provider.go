@@ -10,7 +10,11 @@ import (
 	"strings"
 )
 
-type Prompt struct{ Topic, Business, Audience, Keyword, Brand, Tone string }
+type Prompt struct {
+	Topic, Business, Audience, Keyword, Brand, Tone string
+	Name, Location                                  string // nombre del sitio y ubicación del negocio (del Brand DNA)
+	Sensitive                                       bool   // salud, legal o finanzas
+}
 type Generated struct {
 	Title                     string  `json:"title"`
 	MetaDescription           string  `json:"meta_description"`
@@ -54,8 +58,8 @@ func (*Mock) Create(_ context.Context, p Prompt, _ Config) ProviderResult {
 type Gemini struct{ Client *http.Client }
 
 func (g *Gemini) Create(ctx context.Context, p Prompt, c Config) ProviderResult {
-	prompt := fmt.Sprintf("Escribe en español de México un artículo original, útil y factual. No incluyas HTML, enlaces inventados ni afirmaciones sin sustento. Tema: %s. Negocio: %s. Público: %s. Palabra clave: %s. Marca: %s. Tono: %s. Devuelve JSON con title, meta_description, summary y content (intro, sections con heading/paragraphs/bullets y faq con question/answer).", p.Topic, p.Business, p.Audience, p.Keyword, p.Brand, p.Tone)
-	schema := map[string]any{"type": "OBJECT", "properties": map[string]any{"title": map[string]any{"type": "STRING"}, "meta_description": map[string]any{"type": "STRING"}, "summary": map[string]any{"type": "STRING"}, "content": map[string]any{"type": "OBJECT", "properties": map[string]any{"intro": map[string]any{"type": "STRING"}, "sections": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "OBJECT", "properties": map[string]any{"heading": map[string]any{"type": "STRING"}, "paragraphs": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}}, "bullets": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}}}, "required": []string{"heading", "paragraphs", "bullets"}}}, "faq": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "OBJECT", "properties": map[string]any{"question": map[string]any{"type": "STRING"}, "answer": map[string]any{"type": "STRING"}}, "required": []string{"question", "answer"}}}}, "required": []string{"intro", "sections", "faq"}}}, "required": []string{"title", "meta_description", "summary", "content"}}
+	prompt := writerPrompt(p)
+	schema := map[string]any{"type": "OBJECT", "properties": map[string]any{"title": map[string]any{"type": "STRING"}, "meta_description": map[string]any{"type": "STRING"}, "summary": map[string]any{"type": "STRING"}, "content": map[string]any{"type": "OBJECT", "properties": map[string]any{"intro": map[string]any{"type": "STRING"}, "sections": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "OBJECT", "properties": map[string]any{"heading": map[string]any{"type": "STRING"}, "level": map[string]any{"type": "INTEGER"}, "paragraphs": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}}, "bullets": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "STRING"}}}, "required": []string{"heading", "paragraphs", "bullets"}}}, "faq": map[string]any{"type": "ARRAY", "items": map[string]any{"type": "OBJECT", "properties": map[string]any{"question": map[string]any{"type": "STRING"}, "answer": map[string]any{"type": "STRING"}}, "required": []string{"question", "answer"}}}}, "required": []string{"intro", "sections", "faq"}}}, "required": []string{"title", "meta_description", "summary", "content"}}
 	body, _ := json.Marshal(map[string]any{"contents": []any{map[string]any{"parts": []any{map[string]string{"text": prompt}}}}, "generationConfig": map[string]any{"responseMimeType": "application/json", "responseSchema": schema, "maxOutputTokens": c.MaxOutput, "temperature": 0.6, "thinkingConfig": map[string]any{"thinkingLevel": "low"}}})
 	req, e := http.NewRequestWithContext(ctx, "POST", "https://generativelanguage.googleapis.com/v1beta/models/"+c.Model+":generateContent", bytes.NewReader(body))
 	if e != nil {
@@ -106,7 +110,7 @@ func (g *Gemini) Create(ctx context.Context, p Prompt, c Config) ProviderResult 
 func clean(s string, max int) string {
 	var b strings.Builder
 	for _, r := range s {
-		if r == '<' || r == '>' || r == 0 {
+		if r == '<' || r == '>' || r == 0 || invisible(r) {
 			continue
 		}
 		if b.Len()+len(string(r)) > max {

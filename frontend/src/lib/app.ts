@@ -12,6 +12,8 @@ export type Research = {
 };
 export type Article = {
 	id: string; site_id: string; title: string; slug: string; meta_description: string; summary: string; status: string; has_image: boolean; published_at: string | null;
+	// detalle: lo que la revisión automática pide confirmar; lista: cuántas notas tiene
+	review_notes?: string[] | number;
 	content: { intro: string; sections: { heading: string; level?: number; paragraphs: string[]; bullets: string[] }[]; faq: { question: string; answer: string }[] };
 };
 export type Calendar = {

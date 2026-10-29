@@ -296,19 +296,22 @@ type Article struct {
 	Content                                                   Content
 	PublishedAt                                               *time.Time
 	HasImage                                                  bool
+	ReviewNotes                                               []string // lo que la revisión automática pide confirmar
 }
 
 func articleJSON(a Article) map[string]any {
-	return map[string]any{"id": a.ID, "site_id": a.SiteID, "title": a.Title, "slug": a.Slug, "meta_description": a.MetaDescription, "summary": a.Summary, "content": a.Content, "status": a.Status, "published_at": a.PublishedAt, "has_image": a.HasImage}
+	return map[string]any{"id": a.ID, "site_id": a.SiteID, "title": a.Title, "slug": a.Slug, "meta_description": a.MetaDescription, "summary": a.Summary, "content": a.Content, "status": a.Status, "published_at": a.PublishedAt, "has_image": a.HasImage, "review_notes": a.ReviewNotes}
 }
 func scanArticle(rows *sql.Rows) (Article, error) {
 	var a Article
-	var data []byte
+	var data, notes []byte
 	var published sql.NullTime
-	e := rows.Scan(&a.ID, &a.SiteID, &a.Title, &a.Slug, &a.MetaDescription, &a.Summary, &data, &a.Status, &published, &a.HasImage)
+	e := rows.Scan(&a.ID, &a.SiteID, &a.Title, &a.Slug, &a.MetaDescription, &a.Summary, &data, &a.Status, &published, &a.HasImage, &notes)
 	if e != nil {
 		return a, e
 	}
+	a.ReviewNotes = []string{}
+	_ = json.Unmarshal(notes, &a.ReviewNotes)
 	e = json.Unmarshal(data, &a.Content)
 	if published.Valid {
 		a.PublishedAt = &published.Time
@@ -316,14 +319,14 @@ func scanArticle(rows *sql.Rows) (Article, error) {
 	return a, e
 }
 
-const articleCols = "id,site_id,title,slug,meta_description,summary,content,status,published_at,has_image"
+const articleCols = "id,site_id,title,slug,meta_description,summary,content,status,published_at,has_image,review_notes"
 
 func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 	_, t, ok := a.auth(w, r, false)
 	if !ok {
 		return
 	}
-	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,site_id,title,slug,summary,status,created_at,published_at,has_image FROM articles WHERE tenant_id=$1 ORDER BY created_at DESC`, t)
+	rows, e := a.DB.QueryContext(r.Context(), `SELECT id,site_id,title,slug,summary,status,created_at,published_at,has_image,jsonb_array_length(review_notes) FROM articles WHERE tenant_id=$1 ORDER BY created_at DESC`, t)
 	if e != nil {
 		dbError(w, e)
 		return
@@ -335,7 +338,8 @@ func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 		var created time.Time
 		var published sql.NullTime
 		var hasImage bool
-		if e = rows.Scan(&id, &site, &title, &slug, &summary, &status, &created, &published, &hasImage); e != nil {
+		var notes int
+		if e = rows.Scan(&id, &site, &title, &slug, &summary, &status, &created, &published, &hasImage, &notes); e != nil {
 			dbError(w, e)
 			return
 		}
@@ -343,7 +347,7 @@ func (a *App) articles(w http.ResponseWriter, r *http.Request) {
 		if published.Valid {
 			pub = published.Time
 		}
-		list = append(list, map[string]any{"id": id, "site_id": site, "title": title, "slug": slug, "summary": summary, "status": status, "created_at": created, "published_at": pub, "has_image": hasImage})
+		list = append(list, map[string]any{"id": id, "site_id": site, "title": title, "slug": slug, "summary": summary, "status": status, "created_at": created, "published_at": pub, "has_image": hasImage, "review_notes": notes})
 	}
 	jsonResponse(w, 200, list)
 }
@@ -407,7 +411,10 @@ func (a *App) editArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	body, _ := json.Marshal(content)
-	result, e := a.DB.ExecContext(r.Context(), `UPDATE articles SET title=$1,slug=$2,meta_description=$3,summary=$4,content=$5 WHERE id=$6 AND tenant_id=$7 AND status!='published'`, clean(x.Title, 180), x.Slug, clean(x.MetaDescription, 320), clean(x.Summary, 1000), body, id, t)
+	var facts string
+	_ = a.DB.QueryRowContext(r.Context(), `SELECT s.brand_description FROM articles a JOIN sites s ON s.id=a.site_id WHERE a.id=$1 AND a.tenant_id=$2`, id, t).Scan(&facts)
+	notes, _ := json.Marshal(review(Generated{Title: x.Title, MetaDescription: x.MetaDescription, Summary: x.Summary, Content: content}, facts))
+	result, e := a.DB.ExecContext(r.Context(), `UPDATE articles SET title=$1,slug=$2,meta_description=$3,summary=$4,content=$5,review_notes=$8 WHERE id=$6 AND tenant_id=$7 AND status!='published'`, clean(x.Title, 180), x.Slug, clean(x.MetaDescription, 320), clean(x.Summary, 1000), body, id, t, notes)
 	if e != nil {
 		var pg *pgconn.PgError
 		if errors.As(e, &pg) && pg.Code == "23505" {

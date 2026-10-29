@@ -27,7 +27,7 @@ func (a *App) claim(ctx context.Context) (*WorkItem, error) {
 	defer tx.Rollback()
 	var j WorkItem
 	var keyword, article sql.NullString
-	e = tx.QueryRowContext(ctx, `SELECT j.id,j.tenant_id,j.site_id,j.attempts,j.topic,j.business,j.audience,j.keyword,s.brand_description,s.tone,j.kind,j.article_id FROM jobs j JOIN sites s ON s.id=j.site_id WHERE j.status='queued' AND NOT EXISTS(SELECT 1 FROM jobs r WHERE r.tenant_id=j.tenant_id AND r.status='running') ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&j.ID, &j.Tenant, &j.Site, &j.Attempt, &j.Prompt.Topic, &j.Prompt.Business, &j.Prompt.Audience, &keyword, &j.Prompt.Brand, &j.Prompt.Tone, &j.Kind, &article)
+	e = tx.QueryRowContext(ctx, `SELECT j.id,j.tenant_id,j.site_id,j.attempts,j.topic,j.business,j.audience,j.keyword,s.brand_description,s.tone,j.kind,j.article_id,s.name,COALESCE(s.research->>'location',''),COALESCE(s.research->>'sensitive','')='true' FROM jobs j JOIN sites s ON s.id=j.site_id WHERE j.status='queued' AND NOT EXISTS(SELECT 1 FROM jobs r WHERE r.tenant_id=j.tenant_id AND r.status='running') ORDER BY j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`).Scan(&j.ID, &j.Tenant, &j.Site, &j.Attempt, &j.Prompt.Topic, &j.Prompt.Business, &j.Prompt.Audience, &keyword, &j.Prompt.Brand, &j.Prompt.Tone, &j.Kind, &article, &j.Prompt.Name, &j.Prompt.Location, &j.Prompt.Sensitive)
 	if errors.Is(e, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -126,6 +126,26 @@ func slug(s string) string {
 	}
 	return s
 }
+
+// freeSlug: la dirección corta si está libre en el sitio (también entre las anteriores); si no, «-2», «-3»…
+func freeSlug(ctx context.Context, tx *sql.Tx, site, base, fallback string) (string, error) {
+	for i := 1; i <= 9; i++ {
+		s := base
+		if i > 1 {
+			s = fmt.Sprintf("%s-%d", base, i)
+		}
+		var taken bool
+		e := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM articles WHERE site_id=$1 AND slug=$2) OR EXISTS(SELECT 1 FROM article_slug_aliases WHERE site_id=$1 AND old_slug=$2)`, site, s).Scan(&taken)
+		if e != nil {
+			return "", e
+		}
+		if !taken {
+			return s, nil
+		}
+	}
+	return base + "-" + fallback, nil
+}
+
 func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 	tx, e := a.DB.BeginTx(ctx, nil)
 	if e != nil {
@@ -185,9 +205,15 @@ func (a *App) finish(ctx context.Context, j *WorkItem, p ProviderResult) error {
 		return tx.Commit()
 	}
 	body, _ := json.Marshal(g.Content)
-	articleSlug := slug(g.Title) + "-" + j.ID[:8]
+	// lo que no se puede respaldar (cifras, promesas, estudios) no se publica solo: queda en borrador con la nota
+	notes := review(g, j.Prompt.Brand+"\n"+j.Prompt.Business)
+	notesJSON, _ := json.Marshal(notes)
+	articleSlug, e := freeSlug(ctx, tx, j.Site, shortSlug(g.Title), j.ID[:8])
+	if e != nil {
+		return e
+	}
 	var article string
-	e = tx.QueryRowContext(ctx, `INSERT INTO articles(tenant_id,site_id,job_id,title,slug,meta_description,summary,content,status,published_at) SELECT $1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN s.autopilot AND s.auto_publish AND $9 THEN 'published' ELSE 'draft' END,CASE WHEN s.autopilot AND s.auto_publish AND $9 THEN now() END FROM sites s WHERE s.id=$2 RETURNING id`, j.Tenant, j.Site, j.ID, clean(g.Title, 180), articleSlug, clean(g.MetaDescription, 320), clean(g.Summary, 1000), body, wordCount(g.Content) >= minAutoWords).Scan(&article)
+	e = tx.QueryRowContext(ctx, `INSERT INTO articles(tenant_id,site_id,job_id,title,slug,meta_description,summary,content,status,published_at,review_notes) SELECT $1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN s.autopilot AND s.auto_publish AND $9 THEN 'published' ELSE 'draft' END,CASE WHEN s.autopilot AND s.auto_publish AND $9 THEN now() END,$10 FROM sites s WHERE s.id=$2 RETURNING id`, j.Tenant, j.Site, j.ID, clean(g.Title, 180), articleSlug, clean(trimMeta(g.MetaDescription), 320), clean(g.Summary, 1000), body, wordCount(g.Content) >= minAutoWords && len(notes) == 0, notesJSON).Scan(&article)
 	if e != nil {
 		return e
 	}
