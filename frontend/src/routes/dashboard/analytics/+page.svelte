@@ -1,4 +1,10 @@
 <script lang="ts">
+	import * as Card from '$lib/components/ui/card/index.js';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api';
 	import { siteId } from '#lib/app';
@@ -83,60 +89,85 @@
 	] as [string, string, { text: string; good: boolean }, string, number[]][] : [];
 </script>
 
-<div class="view wide">
-	<div class="row"><div><h1>Analytics</h1><p class="sub">Datos reales de Google Search Console{#if data?.start} · del {data.start} al {data.end}{/if}</p></div>
-		{#if data?.connected && data.property}<div style="display:flex;gap:8px">{#each ['7d', '28d', '90d'] as r}<button class="btn small" class:secondary={range !== r} on:click={() => { range = r; load(); }}>{r}</button>{/each}</div>{/if}
+<div class="flex flex-wrap items-start justify-between gap-3">
+	<div>
+		<h1 class="text-2xl font-semibold tracking-tight">Analytics</h1>
+		<p class="text-sm text-muted-foreground">Datos reales de Google Search Console{#if data?.start} · del {data.start} al {data.end}{/if}</p>
 	</div>
-	{#if notice}<p class="success" role="status">{notice}</p>{/if}
-	{#if error}<p class="error" role="alert">{error}</p>{/if}
-
-	{#if loading}
-		<div class="panel"><span class="spin"></span>Pidiendo tus datos a Google…</div>
-	{:else if data && !data.connected}
-		<div class="panel" style="max-width:640px">
-			<h2 style="font-size:1.4rem;margin:0 0 6px">Conecta Google Search Console</h2>
-			<p class="muted" style="margin-top:0">Así ves cuántas veces Google te muestra, cuántos clics recibes y en qué lugar sales, con los datos reales de Google. Solo lectura: Faro no puede cambiar nada de tu cuenta. Lee la <a href="https://www.hyperionmkt.com/faro/privacidad" target="_blank" rel="noopener" style="text-decoration:underline">política de privacidad</a>.</p>
-			<ul class="muted" style="padding-left:18px;line-height:1.7"><li>Tu sitio debe estar verificado en <b>search.google.com/search-console</b> con esa cuenta.</li><li>Google tarda unos 2-3 días en reportar, y un sitio nuevo necesita semanas para aparecer.</li></ul>
-			{#if data.configured}
-				<button class="btn" on:click={connect} disabled={busy}>{busy ? 'Abriendo Google…' : 'Conectar con Google'}</button>
-			{:else}
-				<p class="error" role="status">Esta función todavía no está configurada en este servidor: faltan las credenciales de Google (ver <code>docs/DATOS.md</code>).</p>
-			{/if}
-		</div>
-	{:else if data && !data.property}
-		<div class="panel" style="max-width:640px"><p class="error" role="alert">{data.error}</p>
-			<div style="display:flex;gap:10px"><button class="btn" on:click={connect} disabled={busy}>Conectar otra cuenta</button><button class="btn ghost" on:click={disconnect} disabled={busy}>Desconectar</button></div></div>
-	{:else if data}
-		<div class="kpis">
-			{#each cards as [label, value, d, hint, series]}
-				<div class="kpi"><span>{label}</span><b>{value}</b>
-					<span class="small" style="font-weight:800;color:{d.good ? 'var(--ink)' : 'var(--accent-d)'}">{d.text} <span class="muted" style="font-weight:500">vs periodo anterior</span></span>
-					{#if series.length > 1}<svg viewBox="0 0 100 32" preserveAspectRatio="none" style="width:100%;height:34px;margin-top:8px" aria-hidden="true"><polyline points={spark(series)} fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" /></svg>{:else}<span class="muted small">{hint}</span>{/if}
-				</div>
-			{/each}
-		</div>
-		{#if !(data.totals?.impressions)}
-			<div class="panel" style="margin-bottom:18px">
-				<b>La conexión funciona, pero Google no reporta impresiones en este periodo.</b>
-				{#if data.history && data.history.days_with_data > 0}
-					<p class="muted" style="margin:6px 0 0">Google sí tiene datos de este sitio: {data.history.days_with_data} días entre el {data.history.first} y el {data.history.last}. Prueba con otro periodo (90d).</p>
-				{:else}
-					<p class="muted" style="margin:6px 0 0">En los últimos 16 meses Google no tiene ni una impresión registrada para <b>{data.property}</b>. Es lo normal si la propiedad se verificó hace poco, si el sitio es nuevo o si todavía casi no sale en búsquedas: Search Console empieza a llenarse uno o dos días después de verificar y un sitio nuevo tarda semanas en aparecer. Faro consulta a Google en vivo cada hora, así que los números aparecerán solos.</p>
-				{/if}
-			</div>
-		{/if}
-		<div class="panel" style="margin-bottom:18px">
-			<h2 style="font-size:1.2rem;margin:0 0 10px">Palabras con las que te encuentran</h2>
-			<div style="overflow-x:auto"><table class="data"><thead><tr><th>Búsqueda</th><th class="r">Clics</th><th class="r">Impresiones</th><th class="r">CTR</th><th class="r">Posición</th></tr></thead><tbody>
-				{#each data.queries || [] as q}<tr><td>{q.query}</td><td class="r">{n(q.clicks)}</td><td class="r">{n(q.impressions)}</td><td class="r">{pct(q.ctr)}</td><td class="r">#{q.position.toFixed(1)}</td></tr>{:else}<tr><td colspan="5" class="muted">Sin datos todavía.</td></tr>{/each}
-			</tbody></table></div>
-		</div>
-		<div class="panel" style="margin-bottom:18px">
-			<h2 style="font-size:1.2rem;margin:0 0 10px">Páginas más vistas en Google</h2>
-			<div style="overflow-x:auto"><table class="data"><thead><tr><th>Página</th><th class="r">Clics</th><th class="r">Impresiones</th><th class="r">CTR</th><th class="r">Posición</th></tr></thead><tbody>
-				{#each data.pages || [] as q}<tr><td>{pageLabel(q.page, multiHost)}</td><td class="r">{n(q.clicks)}</td><td class="r">{n(q.impressions)}</td><td class="r">{pct(q.ctr)}</td><td class="r">#{q.position.toFixed(1)}</td></tr>{:else}<tr><td colspan="5" class="muted">Sin datos todavía.</td></tr>{/each}
-			</tbody></table></div>
-		</div>
-		<p class="muted small">Propiedad: {data.property} · <button class="btn ghost small" on:click={disconnect} disabled={busy}>Desconectar Google</button></p>
+	{#if data?.connected && data.property}
+		<div class="flex gap-2">{#each ['7d', '28d', '90d'] as r}<Button size="sm" variant={range === r ? 'default' : 'secondary'} onclick={() => { range = r; load(); }}>{r}</Button>{/each}</div>
 	{/if}
 </div>
+{#if notice}<Alert.Root role="status"><Alert.Description>{notice}</Alert.Description></Alert.Root>{/if}
+{#if error}<Alert.Root variant="destructive" role="alert"><Alert.Description>{error}</Alert.Description></Alert.Root>{/if}
+
+{#if loading}
+	<Alert.Root role="status"><Spinner /><Alert.Description>Pidiendo tus datos a Google…</Alert.Description></Alert.Root>
+{:else if data && !data.connected}
+	<Card.Root class="max-w-2xl">
+		<Card.Header>
+			<Card.Title class="text-xl">Conecta Google Search Console</Card.Title>
+			<Card.Description>Así ves cuántas veces Google te muestra, cuántos clics recibes y en qué lugar sales, con los datos reales de Google. Solo lectura: Faro no puede cambiar nada de tu cuenta. Lee la <a class="underline" href="https://www.hyperionmkt.com/faro/privacidad" target="_blank" rel="noopener">política de privacidad</a>.</Card.Description>
+		</Card.Header>
+		<Card.Content class="flex flex-col gap-4">
+			<ul class="list-disc pl-5 text-sm text-muted-foreground"><li>Tu sitio debe estar verificado en <b>search.google.com/search-console</b> con esa cuenta.</li><li>Google tarda unos 2-3 días en reportar, y un sitio nuevo necesita semanas para aparecer.</li></ul>
+			{#if !data.configured}<Alert.Root variant="destructive" role="status"><Alert.Description>Esta función todavía no está configurada en este servidor: faltan las credenciales de Google (ver <code>docs/DATOS.md</code>).</Alert.Description></Alert.Root>{/if}
+		</Card.Content>
+		{#if data.configured}<Card.Footer><Button onclick={connect} disabled={busy}>{busy ? 'Abriendo Google…' : 'Conectar con Google'}</Button></Card.Footer>{/if}
+	</Card.Root>
+{:else if data && !data.property}
+	<Card.Root class="max-w-2xl">
+		<Card.Content><Alert.Root variant="destructive" role="alert"><Alert.Description>{data.error}</Alert.Description></Alert.Root></Card.Content>
+		<Card.Footer class="gap-2"><Button onclick={connect} disabled={busy}>Conectar otra cuenta</Button><Button variant="outline" onclick={disconnect} disabled={busy}>Desconectar</Button></Card.Footer>
+	</Card.Root>
+{:else if data}
+	<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+		{#each cards as [label, value, d, hint, series]}
+			<Card.Root>
+				<Card.Header>
+					<Card.Description>{label}</Card.Description>
+					<Card.Title class="text-3xl">{value}</Card.Title>
+					<span class="text-xs {d.good ? '' : 'text-destructive'}">{d.text} <span class="text-muted-foreground">vs periodo anterior</span></span>
+				</Card.Header>
+				<Card.Content>
+					{#if series.length > 1}<svg viewBox="0 0 100 32" preserveAspectRatio="none" class="h-9 w-full text-primary" aria-hidden="true"><polyline points={spark(series)} fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" /></svg>{:else}<span class="text-xs text-muted-foreground">{hint}</span>{/if}
+				</Card.Content>
+			</Card.Root>
+		{/each}
+	</div>
+	{#if !(data.totals?.impressions)}
+		<Alert.Root>
+			<Alert.Title>La conexión funciona, pero Google no reporta impresiones en este periodo.</Alert.Title>
+			<Alert.Description>
+				{#if data.history && data.history.days_with_data > 0}
+					Google sí tiene datos de este sitio: {data.history.days_with_data} días entre el {data.history.first} y el {data.history.last}. Prueba con otro periodo (90d).
+				{:else}
+					En los últimos 16 meses Google no tiene ni una impresión registrada para <b>{data.property}</b>. Es lo normal si la propiedad se verificó hace poco, si el sitio es nuevo o si todavía casi no sale en búsquedas: Search Console empieza a llenarse uno o dos días después de verificar y un sitio nuevo tarda semanas en aparecer. Faro consulta a Google en vivo cada hora, así que los números aparecerán solos.
+				{/if}
+			</Alert.Description>
+		</Alert.Root>
+	{/if}
+	<Card.Root>
+		<Card.Header><Card.Title>Palabras con las que te encuentran</Card.Title></Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header><Table.Row><Table.Head>Búsqueda</Table.Head><Table.Head class="text-right">Clics</Table.Head><Table.Head class="text-right">Impresiones</Table.Head><Table.Head class="text-right">CTR</Table.Head><Table.Head class="text-right">Posición</Table.Head></Table.Row></Table.Header>
+				<Table.Body>
+					{#each data.queries || [] as q}<Table.Row><Table.Cell>{q.query}</Table.Cell><Table.Cell class="text-right tabular-nums">{n(q.clicks)}</Table.Cell><Table.Cell class="text-right tabular-nums">{n(q.impressions)}</Table.Cell><Table.Cell class="text-right tabular-nums">{pct(q.ctr)}</Table.Cell><Table.Cell class="text-right tabular-nums">#{q.position.toFixed(1)}</Table.Cell></Table.Row>{:else}<Table.Row><Table.Cell colspan={5} class="text-muted-foreground">Sin datos todavía.</Table.Cell></Table.Row>{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+	<Card.Root>
+		<Card.Header><Card.Title>Páginas más vistas en Google</Card.Title></Card.Header>
+		<Card.Content>
+			<Table.Root>
+				<Table.Header><Table.Row><Table.Head>Página</Table.Head><Table.Head class="text-right">Clics</Table.Head><Table.Head class="text-right">Impresiones</Table.Head><Table.Head class="text-right">CTR</Table.Head><Table.Head class="text-right">Posición</Table.Head></Table.Row></Table.Header>
+				<Table.Body>
+					{#each data.pages || [] as q}<Table.Row><Table.Cell>{pageLabel(q.page, multiHost)}</Table.Cell><Table.Cell class="text-right tabular-nums">{n(q.clicks)}</Table.Cell><Table.Cell class="text-right tabular-nums">{n(q.impressions)}</Table.Cell><Table.Cell class="text-right tabular-nums">{pct(q.ctr)}</Table.Cell><Table.Cell class="text-right tabular-nums">#{q.position.toFixed(1)}</Table.Cell></Table.Row>{:else}<Table.Row><Table.Cell colspan={5} class="text-muted-foreground">Sin datos todavía.</Table.Cell></Table.Row>{/each}
+				</Table.Body>
+			</Table.Root>
+		</Card.Content>
+	</Card.Root>
+	<p class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">Propiedad: {data.property} · <Button variant="outline" size="sm" onclick={disconnect} disabled={busy}>Desconectar Google</Button></p>
+{/if}

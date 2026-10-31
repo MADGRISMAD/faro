@@ -21,7 +21,7 @@ test('asistente de Brand DNA: la IA sugiere, el cliente ajusta y solo al confirm
 
 	await page.goto(`${panel}/dashboard`);
 	await expect(page.getByRole('heading', { name: 'Tu negocio' })).toBeVisible();
-	await expect(page.locator('.side')).toHaveCount(0); // en la primera vez no hay panel: solo el asistente
+	await expect(page.locator('[data-slot="sidebar"]')).toHaveCount(0); // en la primera vez no hay panel: solo el asistente
 	await expect(page.getByText('Sugerido por la IA')).toBeVisible();
 	await page.screenshot({ path: '../screenshots/wizard-1.png', fullPage: true });
 	await page.locator('textarea').first().fill('Taller mecánico familiar con 20 años en Tijuana.');
@@ -43,13 +43,13 @@ test('asistente de Brand DNA: la IA sugiere, el cliente ajusta y solo al confirm
 	const before = await page.evaluate(async () => { const s = await (await fetch('/api/sites')).json(); const c = await (await fetch(`/api/sites/${s[0].id}/calendar`)).json(); return c.articles.length + c.generating.length; });
 	expect(before).toBe(0);
 	await page.getByRole('button', { name: 'Empezar a escribir' }).click();
-	await expect(page.locator('.side')).toBeVisible();
+	await expect(page.locator('[data-slot="sidebar"]')).toBeVisible();
 
 	const saved = await page.evaluate(async () => { const s = await (await fetch('/api/sites')).json(); return (await fetch(`/api/sites/${s[0].id}/research`)).json(); });
 	expect(saved.brand_confirmed).toBe(true);
 	expect(saved.research.business).toBe('Taller mecánico familiar con 20 años en Tijuana.'); // lo que editó el cliente
 	expect(saved.research.topics).toHaveLength(4); // el tema que quitó ya no está
-	await expect(page.getByText('Escribiendo ahora').or(page.locator('.post').first()).first()).toBeVisible({ timeout: 30000 });
+	await expect(page.getByText('Escribiendo ahora').or(page.getByText('Próxima publicación')).first()).toBeVisible({ timeout: 30000 });
 	// la página de inicio ya con la cola, el calendario y el primer artículo escrito por la IA
 	await page.setViewportSize({ width: 1440, height: 900 });
 	await expect(page.getByRole('link', { name: 'Ver borrador' })).toBeVisible({ timeout: 40000 }); // el texto simulado es corto: queda en borrador, como debe
@@ -63,8 +63,8 @@ test('asistente de Brand DNA: la IA sugiere, el cliente ajusta y solo al confirm
 	await page.reload();
 	await page.waitForTimeout(2500);
 	await page.screenshot({ path: '/tmp/wiz-debug.png', fullPage: true });
-	await expect(page.locator('.latest')).toBeVisible({ timeout: 20000 });
-	await expect(page.locator('.qitem').first()).toBeVisible();
-	await expect(page.locator('.mc .day.on').first()).toBeVisible();
+	await expect(page.getByTestId('latest')).toBeVisible({ timeout: 20000 });
+	await expect(page.locator('[data-slot="item"]').first()).toBeVisible();
+	await expect(page.locator('[data-testid="minical"] [data-marked="true"]').first()).toBeVisible();
 	await page.screenshot({ path: '../screenshots/panel-inicio-completo.png', fullPage: true });
 });

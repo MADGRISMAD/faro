@@ -4,6 +4,17 @@
 	import Auth from '../../lib/Auth.svelte';
 	import { api } from '#lib/api';
 	import { user, ready, sites, siteId, addingSite, research, boot, loadSites, selectSite, stopPolling, refreshSite } from '#lib/app';
+	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Separator } from '$lib/components/ui/separator/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import { Avatar, AvatarFallback } from '$lib/components/ui/avatar/index.js';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import { NativeSelect, NativeSelectOption } from '$lib/components/ui/native-select/index.js';
+	import { House, Dna, CalendarDays, FileText, Plug, Share2, ChartColumn, Search, Settings, Plus, LogOut } from '@lucide/svelte';
 
 	let initialMode: 'login' | 'register' = 'register';
 	let url = '', error = '', busy = false;
@@ -11,17 +22,13 @@
 	onMount(() => {
 		here();
 		if (new URLSearchParams(location.search).get('modo') === 'entrar') initialMode = 'login'; // viene del botón «Iniciar sesión» de la portada
-		document.body.classList.add('in-app');
 		boot();
 		// al volver a la pestaña se ve al momento lo que el autopiloto hizo mientras tanto (artículos y portadas)
 		document.addEventListener('visibilitychange', onVisible);
 	});
 	onDestroy(() => {
 		stopPolling();
-		if (typeof document !== 'undefined') {
-			document.body.classList.remove('in-app');
-			document.removeEventListener('visibilitychange', onVisible);
-		}
+		if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
 	});
 
 	const onVisible = () => document.visibilityState === 'visible' && $user && refreshSite();
@@ -50,11 +57,16 @@
 		siteId.set('');
 	}
 	const nav = [
-		['/dashboard', 'Inicio'],
-		['/dashboard/brand', 'Brand DNA'],
-		['/dashboard/calendario', 'Calendario'],
-		['/dashboard/articulos', 'Artículos'],
-		['/dashboard/conectar', 'Conectar mi sitio']
+		{ href: '/dashboard', label: 'Inicio', icon: House },
+		{ href: '/dashboard/brand', label: 'Brand DNA', icon: Dna },
+		{ href: '/dashboard/calendario', label: 'Calendario', icon: CalendarDays },
+		{ href: '/dashboard/articulos', label: 'Artículos', icon: FileText },
+		{ href: '/dashboard/conectar', label: 'Conectar mi sitio', icon: Plug },
+		{ href: '/dashboard/redes', label: 'Redes sociales', icon: Share2 }
+	];
+	const data = [
+		{ href: '/dashboard/analytics', label: 'Analytics', icon: ChartColumn },
+		{ href: '/dashboard/palabras-clave', label: 'Palabras clave', icon: Search }
 	];
 	let path = '';
 	const here = () => (path = location.pathname.replace(/\/$/, ''));
@@ -65,68 +77,132 @@
 </script>
 
 <svelte:head><title>Faro by Hyperion</title><meta name="robots" content="noindex" /></svelte:head>
-<svelte:window on:popstate={here} />
+<svelte:window onpopstate={here} />
 
 {#if !$ready}
-	<main><p class="muted">Cargando…</p></main>
+	<main class="flex min-h-svh items-center justify-center gap-2 text-muted-foreground"><Spinner />Cargando…</main>
 {:else if !$user}
 	<Auth initial={initialMode} />
 {:else if !$sites.length || $addingSite}
-	<main style="max-width:720px">
-		<p class="eyebrow">Empieza aquí</p>
-		<h1 style="font-size:2.6rem">Pega la dirección de tu sitio</h1>
-		<p class="muted" style="font-size:1.05rem">La IA lee tu sitio, entiende tu negocio, elige los temas y empieza a escribir. No tienes que llenar nada más.</p>
-		<form on:submit|preventDefault={analyze} style="display:flex;gap:10px;flex-wrap:wrap;margin-top:22px">
-			<input bind:value={url} required maxlength="300" placeholder="tusitio.com" aria-label="Dirección de tu sitio" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:220px" />
-			<button class="btn" disabled={busy}>{busy ? 'Enviando…' : 'Analizar mi sitio'}</button>
-		</form>
-		<p class="muted small" style="margin-top:10px">Sirve con o sin https, con www o sin él.</p>
-		{#if error}<p class="error" role="alert">{error}</p>{/if}
-		{#if $addingSite && $sites.length}<button class="btn secondary" style="margin-top:14px" on:click={() => addingSite.set(false)}>Cancelar</button>{/if}
+	<main class="mx-auto flex min-h-svh w-full max-w-xl items-center p-4">
+		<Card.Root class="w-full">
+			<Card.Header>
+				<Badge variant="secondary" class="w-fit">Empieza aquí</Badge>
+				<Card.Title class="text-2xl"><h1>Pega la dirección de tu sitio</h1></Card.Title>
+				<Card.Description>La IA lee tu sitio, entiende tu negocio, elige los temas y empieza a escribir. No tienes que llenar nada más.</Card.Description>
+			</Card.Header>
+			<Card.Content class="flex flex-col gap-3">
+				<form onsubmit={(e) => { e.preventDefault(); (analyze)(); }} class="flex flex-wrap gap-2">
+					<Input bind:value={url} required maxlength={300} placeholder="tusitio.com" aria-label="Dirección de tu sitio" autocapitalize="off" autocorrect="off" spellcheck={false} class="min-w-52 flex-1" />
+					<Button type="submit" disabled={busy}>{busy ? 'Enviando…' : 'Analizar mi sitio'}</Button>
+				</form>
+				<p class="text-sm text-muted-foreground">Sirve con o sin https, con www o sin él.</p>
+				{#if error}<Alert.Root variant="destructive" role="alert"><Alert.Description>{error}</Alert.Description></Alert.Root>{/if}
+			</Card.Content>
+			{#if $addingSite && $sites.length}
+				<Card.Footer><Button variant="secondary" onclick={() => addingSite.set(false)}>Cancelar</Button></Card.Footer>
+			{/if}
+		</Card.Root>
 	</main>
 {:else if reading}
-	<main style="max-width:640px">
-		<p class="eyebrow">{active?.domain}</p>
-		<h1 style="font-size:2.4rem">Leyendo tu sitio…</h1>
-		<div class="panel" role="status"><span class="spin"></span>La IA está entendiendo tu negocio y eligiendo los temas. Tarda menos de un minuto; después podrás revisar todo antes de que escriba nada.</div>
+	<main class="mx-auto flex min-h-svh w-full max-w-xl items-center p-4">
+		<Card.Root class="w-full">
+			<Card.Header>
+				<Badge variant="secondary" class="w-fit">{active?.domain}</Badge>
+				<Card.Title class="text-2xl"><h1>Leyendo tu sitio…</h1></Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<Alert.Root role="status"><Spinner /><Alert.Description>La IA está entendiendo tu negocio y eligiendo los temas. Tarda menos de un minuto; después podrás revisar todo antes de que escriba nada.</Alert.Description></Alert.Root>
+			</Card.Content>
+		</Card.Root>
 	</main>
 {:else if settingUp && $research?.status === 'failed'}
-	<main style="max-width:640px">
-		<h1 style="font-size:2.2rem">No pude leer tu sitio</h1>
-		<p class="error" role="alert">{$research?.error}</p>
-		<button class="btn" on:click={() => addingSite.set(true)}>Probar con otra dirección</button>
+	<main class="mx-auto flex min-h-svh w-full max-w-xl items-center p-4">
+		<Card.Root class="w-full">
+			<Card.Header><Card.Title class="text-2xl"><h1>No pude leer tu sitio</h1></Card.Title></Card.Header>
+			<Card.Content><Alert.Root variant="destructive" role="alert"><Alert.Description>{$research?.error}</Alert.Description></Alert.Root></Card.Content>
+			<Card.Footer><Button onclick={() => addingSite.set(true)}>Probar con otra dirección</Button></Card.Footer>
+		</Card.Root>
 	</main>
 {:else if settingUp && $research?.status === 'done'}
 	<Wizard />
 {:else}
-	<div class="shell">
-		<aside class="side">
-			<a class="brand" href="/dashboard">Faro<small>by Hyperion</small></a>
-			<div class="sitebox">
-				<select aria-label="Sitio" value={$siteId} on:change={(e) => selectSite(e.currentTarget.value)}>
-					{#each $sites as s}<option value={s.id}>{s.name}</option>{/each}
-				</select>
-				<small>{active?.domain}</small>
-			</div>
-			<nav>
-				{#each nav as [href, label]}
-					<a {href} class:on={path === href} on:click={() => (path = href)}>{label}{#if href === '/dashboard/conectar' && $research && !$research.connected}<span class="tag">Falta</span>{/if}</a>
-				{/each}
-				<a href="/dashboard/redes" class:on={path === '/dashboard/redes'} on:click={() => (path = '/dashboard/redes')}>Redes sociales</a>
-				<div class="group">Datos</div>
-				<a href="/dashboard/analytics" class:on={path === '/dashboard/analytics'} on:click={() => (path = '/dashboard/analytics')}>Analytics</a>
-				<a href="/dashboard/palabras-clave" class:on={path === '/dashboard/palabras-clave'} on:click={() => (path = '/dashboard/palabras-clave')}>Palabras clave</a>
-			</nav>
-			<div class="foot">
-				<nav>
-					<a href="/dashboard/ajustes" class:on={path === '/dashboard/ajustes'} on:click={() => (path = '/dashboard/ajustes')}>Ajustes</a>
-					<a href="#nuevo" on:click|preventDefault={() => addingSite.set(true)}>+ Añadir otro sitio</a>
-				</nav>
-				<div class="me"><b>{($user.email || '?').slice(0, 2).toUpperCase()}</b><span>{$user.email}</span></div>
-				<button class="btn secondary small" on:click={logout}>Cerrar sesión</button>
-				<p class="legal"><a href="https://www.hyperionmkt.com/faro/privacidad" target="_blank" rel="noopener">Privacidad</a> · <a href="https://www.hyperionmkt.com/faro/terminos" target="_blank" rel="noopener">Condiciones</a></p>
-			</div>
-		</aside>
-		<slot />
-	</div>
+	<Sidebar.Provider>
+		<Sidebar.Root>
+			<Sidebar.Header>
+				<a href="/dashboard" class="flex flex-col px-2 pt-1 leading-tight"><span class="text-lg font-semibold">Faro</span><span class="text-xs text-muted-foreground">by Hyperion</span></a>
+				<NativeSelect aria-label="Sitio" value={$siteId} onchange={(e) => selectSite(e.currentTarget.value)} class="w-full">
+					{#each $sites as s}<NativeSelectOption value={s.id}>{s.name}</NativeSelectOption>{/each}
+				</NativeSelect>
+				<p class="px-2 text-xs text-muted-foreground">{active?.domain}</p>
+			</Sidebar.Header>
+			<Sidebar.Content>
+				<Sidebar.Group>
+					<Sidebar.GroupContent>
+						<Sidebar.Menu>
+							{#each nav as item}
+								<Sidebar.MenuItem>
+									<Sidebar.MenuButton isActive={path === item.href}>
+										{#snippet child({ props })}
+											<a {...props} href={item.href} onclick={() => (path = item.href)}>
+												<item.icon />
+												<span>{item.label}</span>
+												{#if item.href === '/dashboard/conectar' && $research && !$research.connected}<Badge class="ml-auto">Falta</Badge>{/if}
+											</a>
+										{/snippet}
+									</Sidebar.MenuButton>
+								</Sidebar.MenuItem>
+							{/each}
+						</Sidebar.Menu>
+					</Sidebar.GroupContent>
+				</Sidebar.Group>
+				<Sidebar.Group>
+					<Sidebar.GroupLabel>Datos</Sidebar.GroupLabel>
+					<Sidebar.GroupContent>
+						<Sidebar.Menu>
+							{#each data as item}
+								<Sidebar.MenuItem>
+									<Sidebar.MenuButton isActive={path === item.href}>
+										{#snippet child({ props })}
+											<a {...props} href={item.href} onclick={() => (path = item.href)}><item.icon /><span>{item.label}</span></a>
+										{/snippet}
+									</Sidebar.MenuButton>
+								</Sidebar.MenuItem>
+							{/each}
+						</Sidebar.Menu>
+					</Sidebar.GroupContent>
+				</Sidebar.Group>
+			</Sidebar.Content>
+			<Sidebar.Footer>
+				<Sidebar.Menu>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton isActive={path === '/dashboard/ajustes'}>
+							{#snippet child({ props })}
+								<a {...props} href="/dashboard/ajustes" onclick={() => (path = '/dashboard/ajustes')}><Settings /><span>Ajustes</span></a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+					<Sidebar.MenuItem>
+						<Sidebar.MenuButton>
+							{#snippet child({ props })}
+								<a {...props} href="#nuevo" onclick={(e) => { e.preventDefault(); (() => addingSite.set(true))(); }}><Plus /><span>Añadir otro sitio</span></a>
+							{/snippet}
+						</Sidebar.MenuButton>
+					</Sidebar.MenuItem>
+				</Sidebar.Menu>
+				<Separator />
+				<div class="flex items-center gap-2 px-2 text-sm">
+					<Avatar class="size-8"><AvatarFallback>{($user.email || '?').slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+					<span class="truncate">{$user.email}</span>
+				</div>
+				<Button variant="secondary" size="sm" onclick={logout}><LogOut />Cerrar sesión</Button>
+				<p class="text-center text-xs text-muted-foreground"><a class="underline" href="https://www.hyperionmkt.com/faro/privacidad" target="_blank" rel="noopener">Privacidad</a> · <a class="underline" href="https://www.hyperionmkt.com/faro/terminos" target="_blank" rel="noopener">Condiciones</a></p>
+			</Sidebar.Footer>
+			<Sidebar.Rail />
+		</Sidebar.Root>
+		<Sidebar.Inset>
+			<header class="flex h-12 items-center gap-2 border-b px-4 md:hidden"><Sidebar.Trigger /><span class="font-semibold">Faro</span></header>
+			<div class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-8"><slot /></div>
+		</Sidebar.Inset>
+	</Sidebar.Provider>
 {/if}

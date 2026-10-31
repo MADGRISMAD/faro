@@ -1,4 +1,16 @@
 <script lang="ts">
+	import * as Card from '$lib/components/ui/card/index.js';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import * as Item from '$lib/components/ui/item/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
+	import { Textarea } from '$lib/components/ui/textarea/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.js';
+	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import { Progress } from '$lib/components/ui/progress/index.js';
+	import { X } from '@lucide/svelte';
 	import { api } from '#lib/api';
 	import { research, siteId, refreshSite, imageStyles, intentName } from '#lib/app';
 
@@ -67,73 +79,85 @@
 	};
 </script>
 
-<main class="wizard">
-	<p class="eyebrow">Brand DNA · paso {step + 1} de {steps.length}</p>
-	<div class="steps" aria-hidden="true">{#each steps as _, i}<i class:done={i < step} class:on={i === step}></i>{/each}</div>
-	<h1>{steps[step]}</h1>
-	<p class="muted" style="margin-top:0">Esto es lo que la IA entendió de <b>{$research?.domain}</b>. Está pensado para que solo corrijas lo que no te cuadre.</p>
-
-	<div class="panel" style="margin-top:20px">
-		<p class="suggested"><span class="chip">Sugerido por la IA</span> <span class="muted small">edítalo si quieres</span></p>
-		{#if step === 0}
-			<label>¿Qué hace tu negocio?<textarea rows="5" bind:value={business}></textarea></label>
-			<div class="field" style="padding-bottom:0">
-				<b>Lo que ofreces</b>
-				<div class="chips">{#each themes as t, i}<button class="chip" title="Quitar" on:click={() => (themes = themes.filter((_, j) => j !== i))}>{t} ×</button>{/each}</div>
-				<form style="display:flex;gap:8px" on:submit|preventDefault={addTheme}><input bind:value={newTheme} placeholder="Agregar algo que ofreces" maxlength="100" /><button class="btn ghost small">Agregar</button></form>
-			</div>
-		{:else if step === 1}
-			<label>¿A quién le vendes?<textarea rows="4" bind:value={audience}></textarea></label>
-			<label style="margin-top:14px">Ciudad o zona donde atiendes<input bind:value={location} maxlength="160" /></label>
-		{:else if step === 2}
-			<label>Voz y tono de tu marca<input bind:value={tone} maxlength="160" /></label>
-			<label style="margin-top:14px">Temas a evitar <span class="muted small">(opcional: competidores, precios, servicios que no ofreces)</span><textarea rows="3" bind:value={avoid}></textarea></label>
-		{:else if step === 3}
-			<div class="row"><div><b>Crear una imagen de portada para cada artículo</b><br /><span class="muted small">Ilustración sin texto. Cuesta unos US$0.05 por artículo con su imagen.</span></div>
-				<label class="switch"><input type="checkbox" bind:checked={images} /></label></div>
-			{#if images}
-				<div class="tiles" style="margin-top:18px">{#each imageStyles as s}<button class="tile" class:on={style === s.id} on:click={() => (style = s.id)}><img class="sample" src="/estilos/{s.id}.jpg" width="480" height="270" loading="lazy" alt="Muestra del estilo {s.name}" /><b>{s.name}</b><small>{s.hint}</small></button>{/each}</div>
-				<label style="margin-top:16px">Instrucciones de imagen <span class="muted small">(opcional)</span><input bind:value={notes} maxlength="300" placeholder="Por ejemplo: siempre incluir plantas, colores cálidos" /></label>
-			{/if}
-		{:else if step === 4}
-			<p class="muted" style="margin-top:0">La IA escribirá sobre estos temas, uno por uno. Quita los que no quieras ({kept} seleccionados, mínimo 3).</p>
-			{#each p?.topics || [] as t}
-				<label class="kw" style="grid-template-columns:none;cursor:pointer">
-					<span style="display:flex;gap:12px;align-items:flex-start"><input type="checkbox" style="width:auto;margin-top:4px" checked={!dropped[t.title]} on:change={(e) => (dropped = { ...dropped, [t.title]: !e.currentTarget.checked })} /><span><b>{t.title}</b><br /><span class="muted small">{t.why}</span></span></span>
-					<span class="chip">{intentName[t.intent] || t.intent}</span>
-				</label>
-			{/each}
-		{:else}
-			<div class="field" style="padding-top:0">
-				<div class="row"><div><b>Piloto automático</b><br /><span class="muted small">La IA escribe sola, a un ritmo moderado.</span></div><label class="switch"><input type="checkbox" bind:checked={autopilot} /></label></div>
-			</div>
-			{#if autopilot}
-				<div class="field"><b>Artículos por semana</b>
-					<div style="display:flex;gap:10px">{#each [1, 2, 3] as n}<button class="btn small" class:secondary={perWeek !== n} on:click={() => (perWeek = n)}>{n}</button>{/each}</div>
-					<span class="muted small">Las primeras dos semanas sale 1 por semana: un ritmo constante le sienta mejor a Google que publicar mucho de golpe.</span></div>
-				<div class="field">
-					<div class="row"><div><b>Publicar sin que yo revise</b><br /><span class="muted small">{sensitive ? 'Tu sector es sensible (' + (p?.sensitive_reason || 'salud, legal o finanzas') + '): Google pide revisión de un profesional, así que todo queda en borrador.' : 'Si lo apagas, cada artículo queda en borrador hasta que lo apruebes.'}</span></div>
-						<label class="switch"><input type="checkbox" bind:checked={autoPublish} disabled={sensitive} /></label></div>
+<main class="mx-auto flex min-h-svh w-full max-w-3xl flex-col justify-center gap-4 p-4 md:p-8">
+	<div class="flex flex-col gap-2">
+		<p class="text-sm text-muted-foreground">Brand DNA · paso {step + 1} de {steps.length}</p>
+		<Progress value={((step + 1) / steps.length) * 100} max={100} aria-label="Avance del asistente" />
+	</div>
+	<Card.Root>
+		<Card.Header>
+			<Card.Title class="text-2xl"><h1>{steps[step]}</h1></Card.Title>
+			<Card.Description>Esto es lo que la IA entendió de <b class="text-foreground">{$research?.domain}</b>. Está pensado para que solo corrijas lo que no te cuadre.</Card.Description>
+			<Card.Action><Badge variant="secondary">Sugerido por la IA</Badge></Card.Action>
+		</Card.Header>
+		<Card.Content class="flex flex-col gap-4">
+			{#if step === 0}
+				<Label class="flex-col items-start">¿Qué hace tu negocio?<Textarea rows={5} bind:value={business} /></Label>
+				<div class="flex flex-col gap-2">
+					<b class="text-sm">Lo que ofreces</b>
+					<div class="flex flex-wrap gap-2">{#each themes as t, i}<Badge variant="secondary" class="h-6 gap-1 pr-1">{t}<button type="button" class="rounded-full p-0.5 hover:bg-background" aria-label="Quitar {t}" onclick={() => (themes = themes.filter((_, j) => j !== i))}><X class="size-3" /></button></Badge>{/each}</div>
+					<form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); addTheme(); }}><Input bind:value={newTheme} placeholder="Agregar algo que ofreces" maxlength={100} aria-label="Agregar algo que ofreces" /><Button type="submit" variant="outline">Agregar</Button></form>
 				</div>
+			{:else if step === 1}
+				<Label class="flex-col items-start">¿A quién le vendes?<Textarea rows={4} bind:value={audience} /></Label>
+				<Label class="flex-col items-start">Ciudad o zona donde atiendes<Input bind:value={location} maxlength={160} /></Label>
+			{:else if step === 2}
+				<Label class="flex-col items-start">Voz y tono de tu marca<Input bind:value={tone} maxlength={160} /></Label>
+				<Label class="flex-col items-start">Temas a evitar <span class="font-normal text-muted-foreground">(opcional: competidores, precios, servicios que no ofreces)</span><Textarea rows={3} bind:value={avoid} /></Label>
+			{:else if step === 3}
+				<div class="flex items-center justify-between gap-4">
+					<div><b>Crear una imagen de portada para cada artículo</b><p class="text-sm text-muted-foreground">Ilustración sin texto. Cuesta unos US$0.05 por artículo con su imagen.</p></div>
+					<Switch bind:checked={images} aria-label="Crear una imagen de portada para cada artículo" />
+				</div>
+				{#if images}
+					<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+						{#each imageStyles as s}
+							<Item.Root variant="outline" class="items-stretch {style === s.id ? 'border-primary' : ''}">
+								{#snippet child({ props })}
+									<button {...props} type="button" class="{props.class} cursor-pointer flex-col text-left" aria-pressed={style === s.id} onclick={() => (style = s.id)}>
+										<img class="aspect-video w-full rounded-md object-cover" src="/estilos/{s.id}.jpg" width="480" height="270" loading="lazy" alt="Muestra del estilo {s.name}" />
+										<Item.Content><Item.Title>{s.name}</Item.Title><Item.Description>{s.hint}</Item.Description></Item.Content>
+									</button>
+								{/snippet}
+							</Item.Root>
+						{/each}
+					</div>
+					<Label class="flex-col items-start">Instrucciones de imagen <span class="font-normal text-muted-foreground">(opcional)</span><Input bind:value={notes} maxlength={300} placeholder="Por ejemplo: siempre incluir plantas, colores cálidos" /></Label>
+				{/if}
+			{:else if step === 4}
+				<p class="text-sm text-muted-foreground">La IA escribirá sobre estos temas, uno por uno. Quita los que no quieras ({kept} seleccionados, mínimo 3).</p>
+				{#each p?.topics || [] as t}
+					<Label class="items-start justify-between gap-4 rounded-lg border p-3">
+						<span class="flex items-start gap-3"><Checkbox class="mt-0.5" checked={!dropped[t.title]} onCheckedChange={(v) => (dropped = { ...dropped, [t.title]: !v })} aria-label={t.title} /><span class="flex flex-col gap-1 font-normal"><b class="font-medium">{t.title}</b><span class="text-sm text-muted-foreground">{t.why}</span></span></span>
+						<Badge variant="secondary">{intentName[t.intent] || t.intent}</Badge>
+					</Label>
+				{/each}
+			{:else}
+				<div class="flex items-center justify-between gap-4">
+					<div><b>Piloto automático</b><p class="text-sm text-muted-foreground">La IA escribe sola, a un ritmo moderado.</p></div>
+					<Switch bind:checked={autopilot} aria-label="Piloto automático" />
+				</div>
+				{#if autopilot}
+					<div class="flex flex-col gap-2">
+						<b class="text-sm">Artículos por semana</b>
+						<div class="flex gap-2">{#each [1, 2, 3] as n}<Button size="sm" variant={perWeek === n ? 'default' : 'secondary'} onclick={() => (perWeek = n)}>{n}</Button>{/each}</div>
+						<p class="text-sm text-muted-foreground">Las primeras dos semanas sale 1 por semana: un ritmo constante le sienta mejor a Google que publicar mucho de golpe.</p>
+					</div>
+					<div class="flex items-center justify-between gap-4">
+						<div><b>Publicar sin que yo revise</b><p class="text-sm text-muted-foreground">{sensitive ? 'Tu sector es sensible (' + (p?.sensitive_reason || 'salud, legal o finanzas') + '): Google pide revisión de un profesional, así que todo queda en borrador.' : 'Si lo apagas, cada artículo queda en borrador hasta que lo apruebes.'}</p></div>
+						<Switch bind:checked={autoPublish} disabled={sensitive} aria-label="Publicar sin que yo revise" />
+					</div>
+				{/if}
 			{/if}
-		{/if}
-		{#if error}<p class="error" role="alert" style="margin-top:14px">{error}</p>{/if}
-	</div>
-
-	<div class="row" style="margin-top:22px">
-		<button class="btn ghost" on:click={() => (step -= 1)} disabled={step === 0 || busy}>Atrás</button>
-		{#if step < steps.length - 1}
-			<button class="btn" on:click={next} disabled={busy || (step === 4 && kept < 3)}>{busy ? 'Guardando…' : 'Se ve bien, continuar'}</button>
-		{:else}
-			<button class="btn" on:click={finish} disabled={busy}>{busy ? 'Iniciando…' : 'Empezar a escribir'}</button>
-		{/if}
-	</div>
+			{#if error}<Alert.Root variant="destructive" role="alert"><Alert.Description>{error}</Alert.Description></Alert.Root>{/if}
+		</Card.Content>
+		<Card.Footer class="justify-between">
+			<Button variant="outline" onclick={() => (step -= 1)} disabled={step === 0 || busy}>Atrás</Button>
+			{#if step < steps.length - 1}
+				<Button onclick={next} disabled={busy || (step === 4 && kept < 3)}>{busy ? 'Guardando…' : 'Se ve bien, continuar'}</Button>
+			{:else}
+				<Button onclick={finish} disabled={busy}>{busy ? 'Iniciando…' : 'Empezar a escribir'}</Button>
+			{/if}
+		</Card.Footer>
+	</Card.Root>
 </main>
-
-<style>
-	.wizard{max-width:760px}
-	.steps{display:flex;gap:8px;margin:10px 0 18px}
-	.steps i{height:8px;flex:1;border-radius:99px;background:var(--well);box-shadow:var(--in-s)}
-	.steps i.done{background:var(--accent-l)}.steps i.on{background:var(--accent)}
-	.suggested{margin:0 0 14px;display:flex;gap:10px;align-items:center}
-</style>

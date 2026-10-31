@@ -13,9 +13,9 @@ test('la portada tiene «Iniciar sesión» que lleva al acceso y, con sesión ab
 
 	await page.goto(`${panel}/`);
 	await expect(page.getByRole('heading', { name: 'Que te encuentren primero.' })).toBeVisible();
-	await expect(page.locator('header.top')).toBeVisible();
+	await expect(page.getByRole('banner')).toBeVisible();
 	await page.screenshot({ path: '../screenshots/portada.png', fullPage: true });
-	await page.locator('header.top').getByRole('link', { name: 'Iniciar sesión' }).click();
+	await page.getByRole('banner').getByRole('link', { name: 'Iniciar sesión' }).click();
 	await expect(page).toHaveURL(/\/dashboard\?modo=entrar/);
 	await page.getByLabel('Correo').fill(email);
 	await page.getByLabel('Contraseña').fill(pass);

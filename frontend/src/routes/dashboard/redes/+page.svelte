@@ -1,10 +1,20 @@
 <script lang="ts">
+	import * as Card from '$lib/components/ui/card/index.js';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import * as Item from '$lib/components/ui/item/index.js';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
+	import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio-group/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Label } from '$lib/components/ui/label/index.js';
+	import { Share2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api';
 	import { siteId, sites } from '#lib/app';
 
 	type Post = { title: string; status: string; url: string; error: string; at: string };
 	type Data = { configured: boolean; status: 'none' | 'choosing' | 'connected' | 'broken'; page_name?: string; error?: string; choices: { id: string; name: string }[]; posts: Post[]; unshared: { id: string; title: string; published_at: string }[] };
+	let askDisconnect = false;
 	let data: Data | null = null, error = '', notice = '', busy = false, pick = '', loadedFor = '';
 	const notes: Record<string, string> = {
 		ok: 'Facebook conectado. Desde ahora, cada artículo que se publique se compartirá en tu página.',
@@ -63,7 +73,6 @@
 		await load();
 	});
 	const disconnect = () => run(async () => {
-		if (!confirm('Faro dejará de compartir tus artículos en Facebook. Lo que ya se publicó en tu página no se borra. ¿Desconectar?')) return;
 		await api(`/sites/${$siteId}/facebook`, { method: 'DELETE' });
 		notice = '';
 		await load();
@@ -71,121 +80,111 @@
 	const when = (s: string) => new Date(s).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 </script>
 
-<div class="view redes">
-	<h1>Redes sociales</h1>
-	<p class="sub">Cada artículo que Faro publique en {domain || 'tu sitio'} se comparte solo en tus redes, con su portada y el enlace al artículo.</p>
-	{#if notice}<p class="success" role="status">{notice}</p>{/if}
-	{#if error}<p class="error" role="alert">{error}</p>{/if}
+<div>
+	<h1 class="text-2xl font-semibold tracking-tight">Redes sociales</h1>
+	<p class="text-sm text-muted-foreground">Cada artículo que Faro publique en {domain || 'tu sitio'} se comparte solo en tus redes, con su portada y el enlace al artículo.</p>
+</div>
+{#if notice}<Alert.Root role="status"><Alert.Description>{notice}</Alert.Description></Alert.Root>{/if}
+{#if error}<Alert.Root variant="destructive" role="alert"><Alert.Description>{error}</Alert.Description></Alert.Root>{/if}
 
-	<section class="panel net">
-		<div class="net-head">
-			<span class="logo fb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 8.5V6.8c0-.8.5-1 1-1h2V2.2h-2.9C11 2.2 10.4 4.5 10.4 6v2.5H8v3.7h2.4V22H14v-9.8h2.7l.4-3.7H14Z" /></svg></span>
-			<div class="grow">
-				<h2>Facebook</h2>
-				{#if !data}<small>Cargando…</small>
-				{:else if data.status === 'connected'}<small>Conectado a <b>{data.page_name}</b></small>
-				{:else if data.status === 'broken'}<small class="bad">La conexión dejó de funcionar</small>
-				{:else}<small>Comparte cada artículo en la página de tu negocio</small>{/if}
-			</div>
-			{#if data?.status === 'connected'}<span class="chip ok-chip"><i></i>Activo</span>{/if}
-		</div>
+<AlertDialog.Root bind:open={askDisconnect}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>¿Desconectar Facebook?</AlertDialog.Title>
+			<AlertDialog.Description>Faro dejará de compartir tus artículos en Facebook. Lo que ya se publicó en tu página no se borra.</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancelar</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={disconnect}>Desconectar</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
 
-		{#if data && !data.configured}
-			<p class="muted">La conexión con Facebook se está terminando de configurar en el servidor. Muy pronto podrás usarla.</p>
-		{:else if data?.status === 'choosing' && data.choices.length}
-			<fieldset class="pages">
-				<legend>¿En qué página publicamos?</legend>
+<Card.Root>
+	<Card.Header>
+		<Card.Title class="flex items-center gap-2"><Share2 class="size-5" />Facebook</Card.Title>
+		<Card.Description>
+			{#if !data}Cargando…
+			{:else if data.status === 'connected'}Conectado a <b class="text-foreground">{data.page_name}</b>
+			{:else if data.status === 'broken'}<span class="text-destructive">La conexión dejó de funcionar</span>
+			{:else}Comparte cada artículo en la página de tu negocio{/if}
+		</Card.Description>
+		{#if data?.status === 'connected'}<Card.Action><Badge>Activo</Badge></Card.Action>{/if}
+	</Card.Header>
+
+	{#if data && !data.configured}
+		<Card.Content><p class="text-sm text-muted-foreground">La conexión con Facebook se está terminando de configurar en el servidor. Muy pronto podrás usarla.</p></Card.Content>
+	{:else if data?.status === 'choosing' && data.choices.length}
+		<Card.Content>
+			<p class="mb-3 font-medium">¿En qué página publicamos?</p>
+			<RadioGroup bind:value={pick} class="gap-2">
 				{#each data.choices as c}
-					<label class="page" class:on={pick === c.id}><input type="radio" name="page" value={c.id} bind:group={pick} />{c.name}</label>
+					<Label class="rounded-lg border p-3 {pick === c.id ? 'border-primary' : ''}"><RadioGroupItem value={c.id} />{c.name}</Label>
 				{/each}
-			</fieldset>
-			<div class="acts"><button class="btn" disabled={!pick || busy} on:click={choose}>Usar esta página</button><button class="btn ghost" disabled={busy} on:click={connect}>Volver a autorizar</button></div>
-		{:else if data?.status === 'connected'}
-			<p class="muted">Se comparten solos los artículos que se publiquen desde ahora; los anteriores los puedes compartir abajo. Si un artículo queda en borrador, se comparte hasta que lo publiques.</p>
-			<div class="acts"><button class="btn ghost" disabled={busy} on:click={connect}>Cambiar de página</button><button class="btn danger" disabled={busy} on:click={disconnect}>Desconectar</button></div>
-		{:else if data?.status === 'broken'}
-			<p class="error">{data.error || 'Facebook ya no deja publicar en tu página.'} Suele pasar si cambiaste tu contraseña de Facebook o quitaste el permiso.</p>
-			<div class="acts"><button class="btn" disabled={busy} on:click={connect}>Volver a conectar</button><button class="btn danger" disabled={busy} on:click={disconnect}>Desconectar</button></div>
-		{:else if data}
-			<ul class="how">
+			</RadioGroup>
+		</Card.Content>
+		<Card.Footer class="gap-2"><Button disabled={!pick || busy} onclick={choose}>Usar esta página</Button><Button variant="outline" disabled={busy} onclick={connect}>Volver a autorizar</Button></Card.Footer>
+	{:else if data?.status === 'connected'}
+		<Card.Content><p class="text-sm text-muted-foreground">Se comparten solos los artículos que se publiquen desde ahora; los anteriores los puedes compartir abajo. Si un artículo queda en borrador, se comparte hasta que lo publiques.</p></Card.Content>
+		<Card.Footer class="gap-2"><Button variant="outline" disabled={busy} onclick={connect}>Cambiar de página</Button><Button variant="destructive" disabled={busy} onclick={() => (askDisconnect = true)}>Desconectar</Button></Card.Footer>
+	{:else if data?.status === 'broken'}
+		<Card.Content><Alert.Root variant="destructive"><Alert.Description>{data.error || 'Facebook ya no deja publicar en tu página.'} Suele pasar si cambiaste tu contraseña de Facebook o quitaste el permiso.</Alert.Description></Alert.Root></Card.Content>
+		<Card.Footer class="gap-2"><Button disabled={busy} onclick={connect}>Volver a conectar</Button><Button variant="destructive" disabled={busy} onclick={() => (askDisconnect = true)}>Desconectar</Button></Card.Footer>
+	{:else if data}
+		<Card.Content>
+			<ul class="list-disc pl-5 text-sm text-muted-foreground">
 				<li>Inicias sesión con Facebook y eliges la página de tu negocio.</li>
 				<li>Cuando un artículo se publica, Faro lo comparte con un texto corto, la portada y el enlace.</li>
 				<li>Solo publica en la página que elijas; nunca en tu perfil personal.</li>
 			</ul>
-			<button class="btn" disabled={busy} on:click={connect}>Conectar Facebook</button>
-		{/if}
-	</section>
+		</Card.Content>
+		<Card.Footer><Button disabled={busy} onclick={connect}>Conectar Facebook</Button></Card.Footer>
+	{/if}
+</Card.Root>
 
-	{#if data?.status === 'connected' && data.unshared.length}
-		<section class="panel">
-			<div class="row-head"><div><h2 class="h-posts">Artículos que aún no están en Facebook</h2><small class="muted">Los que publicaste antes de conectar, o los que no se pudieron compartir.</small></div>
-				{#if data.unshared.length > 1}<button class="btn small" disabled={busy} on:click={() => share(data?.unshared.map((a) => a.id) || [])}>Compartir todos ({data.unshared.length})</button>{/if}</div>
-			<ul class="posts">
+{#if data?.status === 'connected' && data.unshared.length}
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Artículos que aún no están en Facebook</Card.Title>
+			<Card.Description>Los que publicaste antes de conectar, o los que no se pudieron compartir.</Card.Description>
+			{#if data.unshared.length > 1}<Card.Action><Button size="sm" disabled={busy} onclick={() => share(data?.unshared.map((a) => a.id) || [])}>Compartir todos ({data.unshared.length})</Button></Card.Action>{/if}
+		</Card.Header>
+		<Card.Content>
+			<Item.Group class="gap-2">
 				{#each data.unshared as a}
-					<li><div class="grow"><b>{a.title}</b><small>Publicado el {when(a.published_at)}</small></div><button class="btn ghost small" disabled={busy} on:click={() => share([a.id])}>Compartir</button></li>
+					<Item.Root variant="outline">
+						<Item.Content><Item.Title>{a.title}</Item.Title><Item.Description>Publicado el {when(a.published_at)}</Item.Description></Item.Content>
+						<Item.Actions><Button variant="outline" size="sm" disabled={busy} onclick={() => share([a.id])}>Compartir</Button></Item.Actions>
+					</Item.Root>
 				{/each}
-			</ul>
-			{#if data.unshared.length > 1}<p class="muted small">«Compartir todos» los publica uno cada 2 horas.</p>{/if}
-		</section>
-	{/if}
+			</Item.Group>
+			{#if data.unshared.length > 1}<p class="mt-3 text-xs text-muted-foreground">«Compartir todos» los publica uno cada 2 horas.</p>{/if}
+		</Card.Content>
+	</Card.Root>
+{/if}
 
-	{#if data?.posts.length}
-		<section class="panel">
-			<h2 class="h-posts">Lo que se ha compartido</h2>
-			<ul class="posts">
+{#if data?.posts.length}
+	<Card.Root>
+		<Card.Header><Card.Title>Lo que se ha compartido</Card.Title></Card.Header>
+		<Card.Content>
+			<Item.Group class="gap-2">
 				{#each data.posts as p}
-					<li>
-						<div class="grow"><b>{p.title}</b><small>{p.status === 'pending' && new Date(p.at) > new Date() ? 'Programado para el ' + when(p.at) : when(p.at)}{#if p.error} · {p.error}{/if}</small></div>
-						<span class="chip st-{p.status}">{statusName[p.status] || p.status}</span>
-						{#if p.url}<a class="btn ghost small" href={p.url} target="_blank" rel="noopener noreferrer">Ver en Facebook</a>{/if}
-					</li>
+					<Item.Root variant="outline">
+						<Item.Content><Item.Title>{p.title}</Item.Title><Item.Description>{p.status === 'pending' && new Date(p.at) > new Date() ? 'Programado para el ' + when(p.at) : when(p.at)}{#if p.error} · {p.error}{/if}</Item.Description></Item.Content>
+						<Item.Actions>
+							<Badge variant={p.status === 'sent' ? 'default' : p.status === 'failed' || p.status === 'unknown' ? 'destructive' : 'secondary'}>{statusName[p.status] || p.status}</Badge>
+							{#if p.url}<Button variant="outline" size="sm" href={p.url} target="_blank" rel="noopener noreferrer">Ver en Facebook</Button>{/if}
+						</Item.Actions>
+					</Item.Root>
 				{/each}
-			</ul>
-		</section>
-	{/if}
+			</Item.Group>
+		</Card.Content>
+	</Card.Root>
+{/if}
 
-	<section class="panel soon">
-		<div class="net-head">
-			<span class="logo ig" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><path d="M17.5 6.5h.01" /></svg></span>
-			<div class="grow"><h2>Instagram, LinkedIn y Google Business</h2><small>Próximamente, sin costo extra</small></div>
-		</div>
-	</section>
-</div>
-
-<style>
-	.redes { display: grid; gap: 22px; }
-	.redes h1 { margin: 0; }
-	.redes .sub { margin: 0 0 4px; }
-	.net-head { display: flex; align-items: center; gap: 16px; }
-	.net-head h2, .h-posts { margin: 0; font-size: 1.2rem; }
-	.net-head small { color: var(--mut); }
-	.net-head .bad { color: #a30b45; font-weight: 700; }
-	.grow { flex: 1; min-width: 0; }
-	.logo { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 15px; flex: none; }
-	.logo svg { width: 24px; height: 24px; }
-	.fb { background: #1877f2; color: #fff; }
-	.fb svg { fill: currentColor; }
-	.ig { background: var(--accent-xl); color: var(--accent); }
-	.ig svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-	.net > p, .net > ul, .pages { margin: 20px 0 0; }
-	.acts { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
-	.net > .btn { margin-top: 18px; }
-	.how { padding-left: 20px; color: #4a3a4e; line-height: 1.7; }
-	.ok-chip { display: inline-flex; align-items: center; gap: 7px; background: #d6f5e3; color: #0f5a2e; }
-	.ok-chip i { width: 7px; height: 7px; border-radius: 50%; background: #16a34a; }
-	.pages { border: 0; padding: 0; display: grid; gap: 10px; }
-	.pages legend { font-weight: 800; margin-bottom: 10px; }
-	.page { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 18px; box-shadow: var(--out-s); font-weight: 700; cursor: pointer; }
-	.page input { width: auto; box-shadow: none; accent-color: var(--accent); }
-	.page.on { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-xl); }
-	.row-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
-	.posts { list-style: none; margin: 14px 0 0; padding: 0; }
-	.posts li { display: flex; align-items: center; gap: 14px; padding: 14px 0; flex-wrap: wrap; }
-	.posts li + li { border-top: 1px solid var(--line); }
-	.posts b { display: block; }
-	.posts small { color: var(--mut); }
-	.st-sent { background: #d6f5e3; color: #0f5a2e; }
-	.st-failed, .st-unknown { background: #ffe0e8; color: #a30b45; }
-	.st-cancelled { background: var(--well); color: var(--mut); }
-	.soon { opacity: .75; }
-</style>
+<Card.Root class="opacity-75">
+	<Card.Header>
+		<Card.Title class="flex items-center gap-2"><Share2 class="size-5" />Instagram, LinkedIn y Google Business</Card.Title>
+		<Card.Description>Próximamente, sin costo extra</Card.Description>
+	</Card.Header>
+</Card.Root>

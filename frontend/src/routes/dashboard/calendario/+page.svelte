@@ -1,4 +1,9 @@
 <script lang="ts">
+	import * as Card from '$lib/components/ui/card/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import { calendar, intentName } from '#lib/app';
 
 	const now = new Date();
@@ -25,39 +30,43 @@
 	const label: Record<string, string> = { published: 'Publicado', draft: 'Borrador', approved: 'Aprobado' };
 </script>
 
-<div class="view wide">
-	<h1>Calendario de contenido</h1>
-	<p class="sub">La IA planea y escribe tus artículos; aquí ves cuándo sale cada uno.</p>
-	<div class="panel">
-		<div class="row" style="margin-bottom:16px">
-			<h2 style="margin:0;font-size:1.4rem">{monthName}</h2>
-			<div style="display:flex;gap:8px;align-items:center">
-				<button class="btn ghost small" aria-label="Mes anterior" on:click={() => shift(-1)}>‹</button>
-				<button class="btn ghost small" on:click={() => { year = now.getFullYear(); month = now.getMonth(); }}>Hoy</button>
-				<button class="btn ghost small" aria-label="Mes siguiente" on:click={() => shift(1)}>›</button>
-			</div>
-		</div>
-		<div class="cal">
-			{#each ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as d}<div class="dow">{d}</div>{/each}
+<div>
+	<h1 class="text-2xl font-semibold tracking-tight">Calendario de contenido</h1>
+	<p class="text-sm text-muted-foreground">La IA planea y escribe tus artículos; aquí ves cuándo sale cada uno.</p>
+</div>
+<Card.Root>
+	<Card.Header>
+		<Card.Title>{monthName}</Card.Title>
+		<Card.Action class="flex items-center gap-2">
+			<Button variant="outline" size="icon-sm" aria-label="Mes anterior" onclick={() => shift(-1)}><ChevronLeft /></Button>
+			<Button variant="outline" size="sm" onclick={() => { year = now.getFullYear(); month = now.getMonth(); }}>Hoy</Button>
+			<Button variant="outline" size="icon-sm" aria-label="Mes siguiente" onclick={() => shift(1)}><ChevronRight /></Button>
+		</Card.Action>
+	</Card.Header>
+	<Card.Content>
+		<div class="grid grid-cols-7 gap-1 sm:gap-2">
+			{#each ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as d}<div class="pb-1 text-center text-xs text-muted-foreground">{d}</div>{/each}
 			{#each days as d}
 				{@const items = byDay[key(d)] || []}
-				<div class="cell" class:off={d.getMonth() !== month} class:today={key(d) === today}>
-					<div class="n"><span>{d.getDate()}</span>{#if key(d) === today}<b style="color:var(--accent)">Hoy</b>{/if}</div>
+				<div class="flex min-h-20 flex-col gap-1 rounded-lg border p-1 sm:min-h-32 sm:p-2 {d.getMonth() !== month ? 'opacity-50' : ''} {key(d) === today ? 'ring-2 ring-ring' : ''}">
+					<div class="flex justify-between text-xs text-muted-foreground"><span>{d.getDate()}</span>{#if key(d) === today}<b class="text-foreground">Hoy</b>{/if}</div>
 					{#each items as it}
 						{#if it.kind === 'article'}
-							<a class="mini" href={`/dashboard/articulos?abrir=${it.id}`} style="text-decoration:none;color:inherit">
-								{#if it.has_image}<img class="thumb" src={`/api/articles/${it.id}/image`} alt="" loading="lazy" />{/if}
-								<b>{it.title}</b><span class="muted">{label[it.status || ''] || ''}</span>
+							<a class="flex flex-col gap-1 rounded-md border bg-card p-1.5 text-xs hover:bg-muted" href={`/dashboard/articulos?abrir=${it.id}`}>
+								{#if it.has_image}<img class="hidden aspect-video w-full rounded object-cover sm:block" src={`/api/articles/${it.id}/image`} alt="" loading="lazy" />{/if}
+								<b class="line-clamp-2">{it.title}</b><span class="text-muted-foreground">{label[it.status || ''] || ''}</span>
 							</a>
 						{:else if it.kind === 'generating'}
-							<div class="mini"><b>{it.title}</b><span class="muted"><span class="spin"></span>Escribiendo…</span></div>
+							<div class="flex flex-col gap-1 rounded-md border bg-card p-1.5 text-xs"><b class="line-clamp-2">{it.title}</b><span class="flex items-center gap-1 text-muted-foreground"><Spinner class="size-3" />Escribiendo…</span></div>
 						{:else}
-							<div class="mini plan"><b>{it.title}</b><span>Planeado · {it.note}</span></div>
+							<div class="flex flex-col gap-1 rounded-md border border-dashed p-1.5 text-xs text-muted-foreground"><b class="line-clamp-2 text-foreground">{it.title}</b><span>Planeado · {it.note}</span></div>
 						{/if}
 					{/each}
 				</div>
 			{/each}
 		</div>
-		<div class="legend"><span><span class="chip published">Publicado</span></span><span><span class="chip draft">Borrador</span></span><span><span class="spin"></span>Escribiendo</span><span><span class="chip plan">Planeado por la IA</span></span></div>
-	</div>
-</div>
+	</Card.Content>
+	<Card.Footer class="flex flex-wrap gap-3 text-sm text-muted-foreground">
+		<Badge>Publicado</Badge><Badge variant="secondary">Borrador</Badge><span class="flex items-center gap-1"><Spinner class="size-3" />Escribiendo</span><Badge variant="outline">Planeado por la IA</Badge>
+	</Card.Footer>
+</Card.Root>

@@ -17,7 +17,7 @@ test('conectar Facebook (simulado), elegir la página y desconectar', async ({ p
 	await page.getByRole('button', { name: 'Usar esta página' }).click();
 	await expect(page.getByText('Conectado a')).toContainText('Otra página');
 	await page.screenshot({ path: '../screenshots/panel-redes.png', fullPage: true });
-	page.once('dialog', (d) => d.accept());
 	await page.getByRole('button', { name: 'Desconectar' }).click();
+	await page.getByRole('alertdialog').getByRole('button', { name: 'Desconectar' }).click();
 	await expect(page.getByRole('button', { name: 'Conectar Facebook' })).toBeVisible();
 });

@@ -28,4 +28,26 @@
 </script>
 <svelte:head><meta name="faro-site" content={data.site.id} /><title>{data.article.title} | {data.site.name}</title><meta name="description" content={data.article.meta_description} /><link rel="canonical" href={url} /><meta property="og:type" content="article" /><meta property="og:title" content={data.article.title} /><meta property="og:description" content={data.article.meta_description} /><meta property="og:url" content={url} />{#if img}<meta property="og:image" content={img} /><meta name="twitter:card" content="summary_large_image" />{/if}<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 {@html ld}</svelte:head>
-<main><article class="article-body"><p class="eyebrow"><a href={data.site.blog_prefix}>← Blog de {data.site.name}</a></p><h1>{data.article.title}</h1><p class="muted">Publicado el {new Date(data.article.published_at).toLocaleDateString('es-MX')}</p>{#if img}<img src={img} alt="Portada: {data.article.title}" width="1376" height="768" style="width:100%;height:auto;border-radius:12px;margin:8px 0 20px" />{/if}<p class="lead">{data.article.summary}</p><p>{data.article.content.intro}</p>{#each data.article.content.sections as section}<section>{#if section.level === 3}<h3>{section.heading}</h3>{:else}<h2>{section.heading}</h2>{/if}{#each section.paragraphs as paragraph}<p>{paragraph}</p>{/each}{#if section.bullets.length}<ul>{#each section.bullets as bullet}<li>{bullet}</li>{/each}</ul>{/if}</section>{/each}{#if data.article.content.faq.length}<section><h2>Preguntas frecuentes</h2>{#each data.article.content.faq as item}<h3>{item.question}</h3><p>{item.answer}</p>{/each}</section>{/if}</article></main>
+<main class="mx-auto w-full max-w-3xl px-4 py-10">
+	<article class="flex flex-col gap-4 leading-7">
+		<p class="text-sm text-muted-foreground"><a class="underline-offset-4 hover:underline" href={data.site.blog_prefix}>← Blog de {data.site.name}</a></p>
+		<h1 class="text-4xl font-semibold tracking-tight">{data.article.title}</h1>
+		<p class="text-sm text-muted-foreground">Publicado el {new Date(data.article.published_at).toLocaleDateString('es-MX')}</p>
+		{#if img}<img src={img} alt="Portada: {data.article.title}" width="1376" height="768" class="my-2 aspect-video w-full rounded-lg object-cover" />{/if}
+		<p class="text-xl text-muted-foreground">{data.article.summary}</p>
+		<p>{data.article.content.intro}</p>
+		{#each data.article.content.sections as section}
+			<section class="flex flex-col gap-4">
+				{#if section.level === 3}<h3 class="mt-4 text-xl font-semibold tracking-tight">{section.heading}</h3>{:else}<h2 class="mt-8 border-b pb-2 text-2xl font-semibold tracking-tight">{section.heading}</h2>{/if}
+				{#each section.paragraphs as paragraph}<p>{paragraph}</p>{/each}
+				{#if section.bullets.length}<ul class="ml-6 list-disc [&>li]:mt-2">{#each section.bullets as bullet}<li>{bullet}</li>{/each}</ul>{/if}
+			</section>
+		{/each}
+		{#if data.article.content.faq.length}
+			<section class="flex flex-col gap-4">
+				<h2 class="mt-8 border-b pb-2 text-2xl font-semibold tracking-tight">Preguntas frecuentes</h2>
+				{#each data.article.content.faq as item}<h3 class="mt-4 text-xl font-semibold tracking-tight">{item.question}</h3><p>{item.answer}</p>{/each}
+			</section>
+		{/if}
+	</article>
+</main>
